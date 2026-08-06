@@ -1,0 +1,363 @@
+import { useState } from 'react'
+import CodeMirror from '@uiw/react-codemirror'
+import { json } from '@codemirror/lang-json'
+import {
+  buildContext,
+  resolveRequest,
+  toCurl,
+  type ApiRequest,
+  type HttpMethod,
+  type RequestAuth,
+} from '@somnolent/core'
+import { useActiveEnv, useBaseEnv, useStore } from '../store'
+import { useSession } from '../sessionStore'
+import { sendRequest } from '../lib/send'
+import { api } from '../lib/api'
+import { TemplateInput } from './TemplateInput'
+import { KeyValueEditor } from './KeyValueEditor'
+import { METHOD_TEXT } from '../lib/methodColors'
+
+const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+type Tab = 'params' | 'headers' | 'auth' | 'body'
+
+function AuthEditor({
+  auth,
+  onChange,
+  ctx,
+}: {
+  auth: RequestAuth
+  onChange: (auth: RequestAuth) => void
+  ctx: Record<string, string>
+}) {
+  return (
+    <div className="flex max-w-md flex-col gap-3">
+      <div className="flex w-fit gap-0.5 rounded-md bg-app p-0.5">
+        {(['none', 'bearer', 'basic'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => onChange({ ...auth, type: t })}
+            className={`rounded px-3 py-1 text-xs transition ${
+              auth.type === t ? 'bg-raised text-ink' : 'text-ink-dim hover:text-ink'
+            }`}
+          >
+            {t === 'none' ? 'nenhuma' : t}
+          </button>
+        ))}
+      </div>
+
+      {auth.type === 'bearer' && (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs text-ink-dim">Token (aceita {'{{ vars }}'})</label>
+          <div className="rounded-md border border-line bg-app focus-within:border-brand">
+            <TemplateInput
+              value={auth.token ?? ''}
+              onChange={(token) => onChange({ ...auth, token })}
+              ctx={ctx}
+              placeholder="{{ token }}"
+            />
+          </div>
+          <p className="text-xs text-ink-faint">
+            Vira o header <span className="font-mono">Authorization: Bearer …</span> no envio.
+          </p>
+        </div>
+      )}
+
+      {auth.type === 'basic' && (
+        <div className="flex flex-col gap-2">
+          <div className="rounded-md border border-line bg-app focus-within:border-brand">
+            <TemplateInput
+              value={auth.username ?? ''}
+              onChange={(username) => onChange({ ...auth, username })}
+              ctx={ctx}
+              placeholder="usuário"
+            />
+          </div>
+          <div className="rounded-md border border-line bg-app focus-within:border-brand">
+            <TemplateInput
+              value={auth.password ?? ''}
+              onChange={(password) => onChange({ ...auth, password })}
+              ctx={ctx}
+              placeholder="senha"
+            />
+          </div>
+          <p className="text-xs text-ink-faint">
+            Vira <span className="font-mono">Authorization: Basic base64(usuário:senha)</span>.
+          </p>
+        </div>
+      )}
+
+      {auth.type !== 'none' && (
+        <p className="text-xs text-ink-faint">
+          Um header <span className="font-mono">Authorization</span> manual na aba Headers tem
+          precedência sobre esta configuração.
+        </p>
+      )}
+    </div>
+  )
+}
+
+export function RequestPanel({ request }: { request: ApiRequest }) {
+  const updateRequest = useStore((s) => s.updateRequest)
+  const pushHistory = useStore((s) => s.pushHistory)
+  const collections = useStore((s) => s.collections)
+  const base = useBaseEnv()
+  const active = useActiveEnv()
+  const setResponse = useSession((s) => s.setResponse)
+  const setSending = useSession((s) => s.setSending)
+  const sending = useSession((s) => s.sending[request.id] ?? false)
+  const [tab, setTab] = useState<Tab>('params')
+  const [copied, setCopied] = useState(false)
+
+  const ctx = buildContext(base, active)
+  const resolved = resolveRequest(request, base, active)
+  const folder = collections.find((c) => c.id === request.collectionId)?.name
+
+  const send = async () => {
+    if (sending || !request.url.trim()) return
+    const final = resolveRequest(request, base, active)
+    if (
+      final.body !== null &&
+      request.bodyType === 'json' &&
+      !final.headers.some((h) => h.key.toLowerCase() === 'content-type')
+    ) {
+      final.headers.push({ key: 'Content-Type', value: 'application/json' })
+    }
+    setSending(request.id, true)
+    let result = await sendRequest(final)
+    // CORS bloqueou no navegador? Se estamos logados, tenta pelo proxy do servidor.
+    const token = useStore.getState().auth.token
+    if (!result.ok && token && result.message.includes('CORS')) {
+      result = await api.proxy(token, final)
+    }
+    setSending(request.id, false)
+    setResponse(request.id, result)
+    if (result.ok) {
+      pushHistory({
+        requestId: request.id,
+        method: final.method,
+        url: final.url,
+        status: result.status,
+        statusText: result.statusText,
+        timeMs: result.timeMs,
+        sizeBytes: result.sizeBytes,
+        headers: result.headers,
+        body: result.body,
+      })
+    }
+  }
+
+  const copyCurl = async () => {
+    const text = toCurl(resolveRequest(request, base, active))
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      // Sem permissão de clipboard: fallback via textarea temporária.
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      ta.remove()
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  const tabs: { id: Tab; label: string; count?: number; dot?: boolean }[] = [
+    { id: 'params', label: 'Query', count: request.queryParams.filter((p) => p.enabled).length },
+    { id: 'headers', label: 'Headers', count: request.headers.filter((h) => h.enabled).length },
+    { id: 'auth', label: 'Auth', dot: !!request.auth && request.auth.type !== 'none' },
+    { id: 'body', label: 'Body', dot: request.bodyType !== 'none' },
+  ]
+
+  return (
+    <section className="flex h-full min-w-0 flex-col bg-panel">
+      {/* trilha: pasta › nome da request */}
+      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-line px-3 text-xs">
+        {folder && (
+          <>
+            <span className="text-ink-faint">{folder}</span>
+            <span className="text-ink-faint">›</span>
+          </>
+        )}
+        <input
+          value={request.name}
+          spellCheck={false}
+          onChange={(e) => updateRequest(request.id, { name: e.target.value })}
+          className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-ink hover:bg-raised focus:bg-raised focus:outline-none"
+        />
+      </div>
+
+      <div className="flex flex-col gap-2 p-3">
+        {/* grupo conectado: método · url · enviar */}
+        <div className="flex items-stretch overflow-hidden rounded-md border border-line bg-app focus-within:border-brand">
+          <select
+            value={request.method}
+            onChange={(e) => updateRequest(request.id, { method: e.target.value as HttpMethod })}
+            className={`cursor-pointer appearance-none border-r border-line bg-raised py-2 pr-7 pl-3 font-mono text-xs font-bold focus:outline-none ${METHOD_TEXT[request.method]}`}
+            style={{
+              backgroundImage:
+                "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%239a9aad' d='M3 4.5L6 8l3-3.5z'/%3E%3C/svg%3E\")",
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 8px center',
+              backgroundSize: '12px',
+            }}
+          >
+            {METHODS.map((m) => (
+              <option key={m}>{m}</option>
+            ))}
+          </select>
+          <div className="min-w-0 flex-1">
+            <TemplateInput
+              value={request.url}
+              onChange={(url) => updateRequest(request.id, { url })}
+              ctx={ctx}
+              placeholder="{{ base_url }}/v1/recurso"
+            />
+          </div>
+          <button
+            onClick={send}
+            disabled={sending || !request.url.trim()}
+            className="shrink-0 bg-brand px-5 text-sm font-semibold text-white transition hover:bg-brand-hi disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {sending ? '…' : 'Enviar'}
+          </button>
+        </div>
+
+        {/* url resolvida no environment ativo */}
+        <div className="flex items-center gap-2 rounded-md border border-line-soft bg-app px-2.5 py-1.5">
+          <span className="shrink-0 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
+            URL final
+          </span>
+          <span className="min-w-0 flex-1 truncate font-mono text-xs">
+            {resolved.missing.length > 0 ? (
+              <span className="text-bad">
+                variáveis faltando: {resolved.missing.join(', ')}
+              </span>
+            ) : (
+              <span className="text-ink-dim" title={resolved.url}>
+                {resolved.url || '—'}
+              </span>
+            )}
+          </span>
+          <button
+            onClick={copyCurl}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-ink-faint transition hover:bg-raised hover:text-ink"
+            title="Copiar como comando curl (com variáveis resolvidas)"
+          >
+            {copied ? 'copiado ✓' : 'cURL'}
+          </button>
+        </div>
+      </div>
+
+      {request.description && (
+        <p className="mx-3 -mt-1 mb-2 border-l-2 border-line pl-2 text-xs leading-relaxed text-ink-faint">
+          {request.description}
+        </p>
+      )}
+
+      {/* abas */}
+      <div className="flex shrink-0 gap-4 border-b border-line px-4">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`-mb-px flex items-center gap-1.5 border-b-2 py-2 text-xs font-medium transition ${
+              tab === t.id
+                ? 'border-brand text-ink'
+                : 'border-transparent text-ink-dim hover:text-ink'
+            }`}
+          >
+            {t.label}
+            {t.count !== undefined && t.count > 0 && (
+              <span className="rounded bg-raised px-1.5 py-px font-mono text-[10px] text-ink-dim">
+                {t.count}
+              </span>
+            )}
+            {t.dot && <span className="size-1.5 rounded-full bg-get" />}
+          </button>
+        ))}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        {tab === 'params' && (
+          <KeyValueEditor
+            items={request.queryParams}
+            onChange={(queryParams) => updateRequest(request.id, { queryParams })}
+            ctx={ctx}
+            keyPlaceholder="param"
+          />
+        )}
+        {tab === 'headers' && (
+          <KeyValueEditor
+            items={request.headers}
+            onChange={(headers) => updateRequest(request.id, { headers })}
+            ctx={ctx}
+            keyPlaceholder="Header"
+          />
+        )}
+        {tab === 'auth' && (
+          <AuthEditor
+            auth={request.auth ?? { type: 'none' }}
+            onChange={(auth) => updateRequest(request.id, { auth })}
+            ctx={ctx}
+          />
+        )}
+        {tab === 'body' && (
+          <div className="flex h-full flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex w-fit gap-0.5 rounded-md bg-app p-0.5">
+                {(['none', 'json', 'text'] as const).map((bt) => (
+                  <button
+                    key={bt}
+                    onClick={() =>
+                      updateRequest(request.id, {
+                        bodyType: bt,
+                        body: bt === 'none' ? null : (request.body ?? ''),
+                      })
+                    }
+                    className={`rounded px-3 py-1 text-xs transition ${
+                      request.bodyType === bt ? 'bg-raised text-ink' : 'text-ink-dim hover:text-ink'
+                    }`}
+                  >
+                    {bt}
+                  </button>
+                ))}
+              </div>
+              {request.bodyType === 'json' && (
+                <button
+                  onClick={() => {
+                    try {
+                      updateRequest(request.id, {
+                        body: JSON.stringify(JSON.parse(request.body ?? ''), null, 2),
+                      })
+                    } catch {
+                      /* JSON inválido (ou com {{vars}}): mantém como está */
+                    }
+                  }}
+                  className="ml-auto rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
+                >
+                  formatar
+                </button>
+              )}
+            </div>
+            {request.bodyType !== 'none' ? (
+              <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-line bg-app">
+                <CodeMirror
+                  value={request.body ?? ''}
+                  onChange={(body) => updateRequest(request.id, { body })}
+                  extensions={request.bodyType === 'json' ? [json()] : []}
+                  theme="dark"
+                  height="100%"
+                  style={{ height: '100%' }}
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-ink-faint">Esta request não envia body.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
