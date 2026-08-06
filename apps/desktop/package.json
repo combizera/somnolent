@@ -1,0 +1,13 @@
+{
+  "name": "@somnolent/desktop",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "tauri dev",
+    "bundle": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  }
+}
