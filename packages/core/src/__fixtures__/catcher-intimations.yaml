@@ -1,0 +1,410 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: Catcher - Intimations
+meta:
+  id: wrk_3d62f26a169644a5969a44e76c165bff
+  created: 1784293686789
+  modified: 1784293686789
+  description: ""
+collection:
+  - url: "{{ _.base_url }}/account"
+    name: Account Detail
+    meta:
+      id: req_70f7e405b7d54e73b2c43e3bf2b9af41
+      created: 1784235393815
+      modified: 1785881873052
+      isPrivate: false
+      description: ""
+      sortKey: -1783691493151
+    method: GET
+    authentication:
+      type: bearer
+      token: "{{ _.token_staging }}"
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - name: Trackers
+    meta:
+      id: fld_0c1eabe5c505480ca79c73c33192d7e7
+      created: 1783691493051
+      modified: 1783691493051
+      sortKey: -1783691493051
+      description: ""
+    children:
+      - url: "{{ _.base_url }}/trackers"
+        name: Create Tracker
+        meta:
+          id: req_d0cec4924d5f4f13b966f4562ecff217
+          created: 1783601760290
+          modified: 1784919060939
+          isPrivate: false
+          description: ""
+          sortKey: -1783691524762
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+            	"type": "lawyer",
+            	"name": "HEL MIGLIORANZA SCHMITT",
+            	"oab_number": "123456",
+            	"oab_state": "RS",
+            	"oab_required": false,
+            	"exact_match": false,
+            	"include_text": true,
+            	"remote_id": "1234"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ _.token_diff }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/trackers"
+        name: List all Trackers
+        meta:
+          id: req_2ce4a8dd0f794467a0b6eb29dfccd480
+          created: 1783690925491
+          modified: 1785522697937
+          isPrivate: false
+          description: ""
+          sortKey: -1783691524862
+        method: GET
+        parameters:
+          - name: remote_id
+            value: "65"
+            description: ""
+            disabled: true
+          - name: q
+            value: HELOISA
+            description: ""
+            disabled: true
+          - name: active
+            value: "true"
+            description: ""
+            disabled: true
+          - name: type
+            value: person
+            description: ""
+            disabled: true
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/trackers/1157"
+        name: Delete Tracker
+        meta:
+          id: req_81b4076cc11b4446832e51b8d406a1e6
+          created: 1783691009045
+          modified: 1784919100719
+          isPrivate: false
+          description: ""
+          sortKey: -1783691503514
+        method: DELETE
+        authentication:
+          type: bearer
+          token: "{{ _.token_diff }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/trackers/:id"
+        name: "List Tracker Detail "
+        meta:
+          id: req_d71a36c4d1e046a1b4fb44f9a23a7e8b
+          created: 1783691288271
+          modified: 1785780486712
+          isPrivate: false
+          description: ""
+          sortKey: -1783691524812
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+        pathParameters:
+          - name: id
+            value: "8684"
+      - url: "{{ _.base_url }}/trackers/:id"
+        name: Update Tracker
+        meta:
+          id: req_664b1eecabd948c4b3c8f50cac03a185
+          created: 1784304000002
+          modified: 1785521939600
+          isPrivate: false
+          description: ""
+          sortKey: -1783691524787
+        method: PUT
+        body:
+          mimeType: application/json
+          text: |-
+            {
+            	"positive_terms": []
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+        pathParameters:
+          - name: id
+            value: "1164"
+      - name: Intimations
+        meta:
+          id: fld_7d7bf8ba78de4a2ba63894bcd1461ccf
+          created: 1783715072617
+          modified: 1784929809880
+          sortKey: -1783691525062
+          description: ""
+        children:
+          - url: "{{ _.base_url }}/trackers/:id/communications"
+            name: List Intimations by Tracker
+            meta:
+              id: req_62d8c6a80670453da6a671a731767a5d
+              created: 1783715080830
+              modified: 1784928790447
+              isPrivate: false
+              description: ""
+              sortKey: -1783715082906
+            method: GET
+            parameters:
+              - name: status
+                value: all
+                description: ""
+                disabled: false
+              - name: page
+                value: "1"
+                description: ""
+                disabled: true
+              - name: published_at
+                value: 2026-07-21
+                description: ""
+                disabled: true
+              - name: reference_date
+                value: 2026-07-13
+                description: ""
+                disabled: true
+            authentication:
+              type: bearer
+              token: "{{ _.token_staging }}"
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+            pathParameters:
+              - name: id
+                value: ""
+          - url: "{{ _.base_url }}/communications"
+            name: List all Intimations
+            meta:
+              id: req_8c8bdb3f5e3d41358c6a2c897fdbf005
+              created: 1784216824979
+              modified: 1785780218572
+              isPrivate: false
+              description: ""
+              sortKey: -1783703303834
+            method: GET
+            parameters:
+              - name: status
+                value: all
+                description: ""
+                disabled: false
+              - name: tracker_id
+                value: "8684"
+                description: ""
+                disabled: false
+              - name: per_page
+                value: ""
+                description: ""
+                disabled: true
+              - name: published_at
+                value: 2026-07-30
+                description: ""
+                disabled: true
+              - name: reference_date
+                value: 2026-07-13
+                description: ""
+                disabled: true
+            authentication:
+              type: bearer
+              token: "{{ _.token }}"
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.base_url }}/communications/read"
+            name: Mark Intimations as Read
+            meta:
+              id: req_3defd317f36e47dbb5dd60c4762ba55f
+              created: 1784304000005
+              modified: 1784772203943
+              isPrivate: false
+              description: ""
+              sortKey: -1783703303734
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                	"delivery_ids": [27177244, 27165673, 75992]
+                }
+            headers:
+              - name: Content-Type
+                value: application/json
+            authentication:
+              type: bearer
+              token: FAKE-token-base-para-testes-0000000000000000
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.base_url }}/busca/nome"
+            name: Search Intimations by Name
+            meta:
+              id: req_74de036ef9cd4e9882b3c66dbc64a8b7
+              created: 1784304000006
+              modified: 1784304000006
+              isPrivate: false
+              description: essa rota NÃO migrou pra inglês — os params e as chaves da resposta
+                seguem em PT
+              sortKey: -1783703303634
+            method: GET
+            parameters:
+              - name: nome
+                value: HELOISA MIGLIORANZA SCHMITT
+                description: ""
+                disabled: false
+              - name: data
+                value: 2026-07-16
+                description: ""
+                disabled: false
+              - name: oab
+                value: 123456/RS
+                description: ""
+                disabled: true
+            authentication:
+              type: bearer
+              token: FAKE-token-base-para-testes-0000000000000000
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.base_url }}/communications/:id"
+            name: List Single Intimation
+            meta:
+              id: req_870fad32d2d44ac48ff5315fd69d9634
+              created: 1784755273612
+              modified: 1784772049135
+              isPrivate: false
+              description: ""
+              sortKey: -1783703303784
+            method: GET
+            authentication:
+              type: bearer
+              token: FAKE-token-base-para-testes-0000000000000000
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+            pathParameters:
+              - name: id
+                value: "27177244"
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_b914fac8daf54d4f8096bc64f5ee6bfa
+    created: 1783691423548
+    modified: 1783691423548
+environments:
+  name: Base Environment
+  meta:
+    id: env_295c71b2949144b4bb09e7ef4f26cecd
+    created: 1783691423547
+    modified: 1785177022055
+    isPrivate: false
+  data:
+    base_url: https://captura-djen.munin.ia.br/api/v1
+    token: FAKE-token-base-para-testes-0000000000000000
+  subEnvironments:
+    - name: Staging
+      meta:
+        id: env_6bfb31d22e99457cba86c7a51fa34dae
+        created: 1785176939595
+        modified: 1785176965570
+        isPrivate: false
+        sortKey: 1785176939595
+      data:
+        token: FAKE-token-staging-para-testes-000000000000000
+        "": ""
+      color: "#f9f001"
+    - name: Production
+      meta:
+        id: env_d9e80cf4c01e49dca894afea38df1f31
+        created: 1785176968600
+        modified: 1785453147686
+        isPrivate: false
+        sortKey: 1785176968600
+      data:
+        token: FAKE-token-production-para-testes-00000000000
+        "": ""
+      color: "#e10505"

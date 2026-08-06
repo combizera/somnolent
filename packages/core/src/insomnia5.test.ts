@@ -1,0 +1,187 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { beforeAll, describe, expect, it } from "vitest";
+import { importInsomniaExport, type ImportResult } from "./importer.js";
+import { importInsomniaV5, isInsomniaV5 } from "./insomnia5.js";
+
+const fixture = readFileSync(
+  fileURLToPath(new URL("./__fixtures__/catcher-intimations.yaml", import.meta.url)),
+  "utf-8",
+);
+
+let counter = 0;
+const opts = {
+  workspaceId: "ws-1",
+  makeId: () => `id-${++counter}`,
+  now: () => "2026-08-04T00:00:00.000Z",
+};
+
+describe("importInsomniaExport — arquivo real do Insomnia v5", () => {
+  let result: ImportResult;
+
+  beforeAll(async () => {
+    result = await importInsomniaExport(fixture, opts);
+  });
+
+  it("detecta o formato v5 e o nome da collection", () => {
+    expect(result.format).toBe("insomnia-v5");
+    expect(result.sourceName).toBe("Catcher - Intimations");
+  });
+
+  it("importa todas as 11 requests do arquivo", () => {
+    expect(result.requests).toHaveLength(11);
+  });
+
+  it("achata pastas aninhadas usando o caminho completo", () => {
+    expect(result.collections.map((c) => c.name)).toEqual([
+      "Trackers",
+      "Trackers / Intimations",
+    ]);
+  });
+
+  it("request fora de pasta fica na raiz", () => {
+    const account = result.requests.find((r) => r.name === "Account Detail")!;
+    expect(account.collectionId).toBeNull();
+    expect(account.method).toBe("GET");
+  });
+
+  it("liga cada request à pasta certa", () => {
+    const trackers = result.collections.find((c) => c.name === "Trackers")!;
+    const intimations = result.collections.find((c) => c.name === "Trackers / Intimations")!;
+
+    expect(result.requests.find((r) => r.name === "Create Tracker")!.collectionId).toBe(
+      trackers.id,
+    );
+    expect(
+      result.requests.find((r) => r.name === "List all Intimations")!.collectionId,
+    ).toBe(intimations.id);
+  });
+
+  it("converte {{ _.var }} para {{ var }} na URL e no auth", () => {
+    const account = result.requests.find((r) => r.name === "Account Detail")!;
+    expect(account.url).toBe("{{ base_url }}/account");
+    expect(account.auth).toEqual({ type: "bearer", token: "{{ token_staging }}" });
+  });
+
+  it("substitui path params pelo valor guardado", () => {
+    const detail = result.requests.find((r) => r.name === "List Tracker Detail")!;
+    expect(detail.url).toBe("{{ base_url }}/trackers/8684");
+
+    const update = result.requests.find((r) => r.name === "Update Tracker")!;
+    expect(update.url).toBe("{{ base_url }}/trackers/1164");
+  });
+
+  it("path param vazio permanece na URL e vira aviso", () => {
+    const byTracker = result.requests.find(
+      (r) => r.name === "List Intimations by Tracker",
+    )!;
+    expect(byTracker.url).toBe("{{ base_url }}/trackers/:id/communications");
+    expect(result.warnings.some((w) => w.includes("List Intimations by Tracker"))).toBe(
+      true,
+    );
+  });
+
+  it("preserva query params desabilitados", () => {
+    const list = result.requests.find((r) => r.name === "List all Trackers")!;
+    expect(list.queryParams).toHaveLength(4);
+    expect(list.queryParams.every((p) => !p.enabled)).toBe(true);
+    expect(list.queryParams.map((p) => p.key)).toEqual(["remote_id", "q", "active", "type"]);
+  });
+
+  it("mistura params ligados e desligados corretamente", () => {
+    const all = result.requests.find((r) => r.name === "List all Intimations")!;
+    const enabled = all.queryParams.filter((p) => p.enabled).map((p) => p.key);
+    expect(enabled).toEqual(["status", "tracker_id"]);
+  });
+
+  it("importa body JSON e header Content-Type", () => {
+    const create = result.requests.find((r) => r.name === "Create Tracker")!;
+    expect(create.bodyType).toBe("json");
+    expect(create.body).toContain('"oab_number": "123456"');
+    expect(create.headers).toEqual([
+      expect.objectContaining({ key: "Content-Type", value: "application/json" }),
+    ]);
+  });
+
+  it("guarda a descrição da request", () => {
+    const busca = result.requests.find((r) => r.name === "Search Intimations by Name")!;
+    expect(busca.description).toContain("NÃO migrou pra inglês");
+  });
+
+  it("importa base environment e sub-environments com cor", () => {
+    expect(result.environments.map((e) => e.name)).toEqual([
+      "Base",
+      "Staging",
+      "Production",
+    ]);
+    const [base, staging, prod] = result.environments;
+    expect(base!.isBase).toBe(true);
+    expect(staging!.color).toBe("#f9f001");
+    expect(prod!.color).toBe("#e10505");
+  });
+
+  it("marca credenciais como secretas e deixa base_url normal", () => {
+    const base = result.environments.find((e) => e.isBase)!;
+    expect(base.variables.find((v) => v.key === "base_url")).toMatchObject({
+      value: "https://captura-djen.munin.ia.br/api/v1",
+      secret: false,
+    });
+    expect(base.variables.find((v) => v.key === "token")!.secret).toBe(true);
+  });
+
+  it("descarta a chave vazia que o Insomnia deixa nos environments", () => {
+    const staging = result.environments.find((e) => e.name === "Staging")!;
+    expect(staging.variables.map((v) => v.key)).toEqual(["token"]);
+  });
+
+  it("avisa sobre tokens escritos direto no auth", () => {
+    expect(result.warnings.some((w) => w.includes("token escrito direto"))).toBe(true);
+  });
+
+  it("respeita a ordem por sortKey dentro da pasta", () => {
+    const trackers = result.collections.find((c) => c.name === "Trackers")!;
+    const names = result.requests
+      .filter((r) => r.collectionId === trackers.id)
+      .map((r) => r.name);
+    expect(names[0]).toBe("List all Trackers");
+    expect(names.at(-1)).toBe("Delete Tracker");
+  });
+});
+
+describe("detecção de formato", () => {
+  it("isInsomniaV5 reconhece o cabeçalho do v5", () => {
+    expect(isInsomniaV5({ type: "collection.insomnia.rest/5.0" })).toBe(true);
+    expect(isInsomniaV5({ _type: "export", resources: [] })).toBe(false);
+  });
+
+  it("importInsomniaV5 rejeita documento sem o cabeçalho", () => {
+    expect(() => importInsomniaV5({ collection: [] }, opts)).toThrow(/v5/);
+  });
+
+  it("ainda importa o formato v4 em JSON", async () => {
+    const v4 = JSON.stringify({
+      _type: "export",
+      __export_format: 4,
+      resources: [
+        { _id: "wrk_1", _type: "workspace", parentId: null, name: "W" },
+        {
+          _id: "req_1",
+          _type: "request",
+          parentId: "wrk_1",
+          name: "Ping",
+          method: "GET",
+          url: "{{ _.base_url }}/ping",
+        },
+      ],
+    });
+    const result = await importInsomniaExport(v4, opts);
+    expect(result.format).toBe("insomnia-v4");
+    expect(result.requests[0]?.url).toBe("{{ base_url }}/ping");
+  });
+
+  it("explica o erro quando o arquivo não é um export do Insomnia", async () => {
+    await expect(importInsomniaExport('{"foo":1}', opts)).rejects.toThrow(
+      /Formato não reconhecido/,
+    );
+  });
+});
