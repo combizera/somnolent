@@ -1,0 +1,12 @@
+node_modules/
+dist/
+target/
+*.local
+.env
+package-lock.json
+.DS_Store
+
+# Exports do Insomnia costumam carregar tokens reais — não versionar
+catcher-intimations
+*.insomnia.yaml
+
