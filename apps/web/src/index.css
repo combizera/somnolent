@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+@theme {
+  /* superfícies — cinzas com viés roxo, não neutros */
+  --color-app: #16161b;
+  --color-panel: #1c1c23;
+  --color-raised: #23232c;
+  --color-hover: #2c2c38;
+  --color-line: #2e2e3a;
+  --color-line-soft: #262630;
+
+  /* texto */
+  --color-ink: #e6e6ee;
+  --color-ink-dim: #9a9aad;
+  --color-ink-faint: #6a6a7c;
+
+  /* marca — o roxo conduz todos os controles */
+  --color-brand: #7c5cff;
+  --color-brand-hi: #9179ff;
+  --color-brand-soft: #262046;
+
+  /* métodos HTTP */
+  --color-get: #74c264;
+  --color-post: #a78bfa;
+  --color-put: #efa14e;
+  --color-patch: #e58a63;
+  --color-delete: #ef6b76;
+  --color-plain: #8b8b9c;
+
+  /* estado semântico — separado da marca */
+  --color-ok: #58ad4c;
+  --color-info: #4f97e8;
+  --color-warn: #d9a021;
+  --color-bad: #e0525f;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-app);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* barras de rolagem finas, no tom do painel */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3d3d4c;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* CodeMirror herda as superfícies do app */
+.cm-editor {
+  background: transparent !important;
+  height: 100%;
+}
+
+.cm-editor.cm-focused {
+  outline: none !important;
+}
+
+.cm-scroller {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  font-size: 12.5px !important;
+  line-height: 1.6 !important;
+}
+
+.cm-gutters {
+  background: transparent !important;
+  border-right: 1px solid var(--color-line-soft) !important;
+  color: var(--color-ink-faint) !important;
+}
+
+.cm-activeLine,
+.cm-activeLineGutter {
+  background: rgba(124, 92, 255, 0.06) !important;
+}
+
+/* foco visível e consistente em toda a UI */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 1px;
+}
+
+/* o Tailwind v4 não dá cursor: pointer pra botão — tudo que clica, clica */
+button,
+select,
+summary,
+a[href],
+label[for],
+[role="button"],
+input[type="checkbox"],
+input[type="radio"],
+input[type="color"],
+input[type="range"] {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+input:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* arraste: o item some parcialmente e o ponteiro vira "agarrando" */
+body.is-dragging,
+body.is-dragging * {
+  cursor: grabbing !important;
+}
+
+.drag-source {
+  opacity: 0.4;
+}
+
+select option {
+  background: var(--color-raised);
+  color: var(--color-ink);
+}
