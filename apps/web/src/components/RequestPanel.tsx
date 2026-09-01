@@ -105,8 +105,8 @@ function PathParams({
         return (
           <div
             key={name}
-            className={`grid grid-cols-[1fr_1.5fr] items-center gap-1 rounded-md border bg-app transition ${
-              preenchido ? 'border-line-soft hover:border-line' : 'border-bad/40'
+            className={`grid grid-cols-[1fr_1.5fr] items-center gap-1 rounded-md border-2 bg-app transition ${
+              preenchido ? 'border-line-soft hover:border-line' : 'border-bad'
             }`}
           >
             <span

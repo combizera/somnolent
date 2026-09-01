@@ -140,8 +140,9 @@ export function resolveRequest(
   const pathValues = Object.fromEntries(
     resolvePairs(request.pathParams ?? [], ctx, missing).map(({ key, value }) => [key, value]),
   );
+  // Path param vazio NÃO entra em `missing`: a linha dele já fica vermelha na
+  // aba Params, e a request continua enviável — quem responde é a API.
   const withPath = applyPathParams(url.output, pathValues);
-  for (const m of withPath.missing) missing.add(m);
 
   const query = resolvePairs(request.queryParams, ctx, missing);
   let finalUrl = withPath.output;

@@ -131,9 +131,19 @@ describe('path params (:id)', () => {
     expect(screen.getByText('https://api.com/pushes/abc-123/force')).toBeDefined()
   })
 
-  it('valor vazio é reportado como faltando, igual a {{var}} indefinida', () => {
+  it('valor vazio não gera aviso de texto — a borda vermelha basta', () => {
     abrirRequestCom('https://api.com/pushes/:push_id/force')
     render(<App />)
-    expect(screen.getByText(/variáveis faltando: :push_id/)).toBeDefined()
+    expect(screen.queryByText(/variáveis faltando/)).toBeNull()
+    // a linha "URL final" mostra o :push_id cru, que é o que sairia no send
+    const urlFinal = screen.getByText('URL final').parentElement!
+    expect(urlFinal.textContent).toContain('https://api.com/pushes/:push_id/force')
+  })
+
+  it('a request continua enviável mesmo com path param vazio', () => {
+    abrirRequestCom('https://api.com/pushes/:push_id/force')
+    render(<App />)
+    const enviar = screen.getByRole('button', { name: /Enviar/ }) as HTMLButtonElement
+    expect(enviar.disabled).toBe(false)
   })
 })

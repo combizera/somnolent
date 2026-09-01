@@ -322,7 +322,7 @@ describe("path params (:id)", () => {
     expect(out.missing).toEqual([]);
   });
 
-  it("path param faltando aparece em missing, como {{var}} indefinida", () => {
+  it("path param vazio não vira aviso: fica na URL e a request segue enviável", () => {
     const request: ApiRequest = {
       id: "r2",
       projectId: "prj-1",
@@ -339,7 +339,10 @@ describe("path params (:id)", () => {
       version: 1,
       updatedAt: "2026-09-01T00:00:00.000Z",
     };
-    expect(resolveRequest(request, null, null).missing).toEqual([":push_id"]);
+    const out = resolveRequest(request, null, null);
+    expect(out.missing).toEqual([]);
+    // o :push_id continua cru na URL — é o que vai pro servidor
+    expect(out.url).toBe("https://api.com/pushes/:push_id/force");
   });
 
   it("o valor do path param também aceita {{var}}", () => {
