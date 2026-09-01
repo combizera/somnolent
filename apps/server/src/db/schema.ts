@@ -9,57 +9,53 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  email: text('email').notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
-
-export const workspaces = pgTable('workspaces', {
+/** Project: o nível de topo, dono das collections. Era `workspaces`. */
+export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const workspaceMembers = pgTable(
-  'workspace_members',
+/**
+ * Chave de acesso — a credencial. Não existe conta: quem tem a chave sincroniza
+ * o que ela abre. Várias chaves por alvo, cada uma com rótulo e papel, pra dar
+ * revogação por pessoa sem cadastrar pessoa.
+ *
+ * O valor cru só existe no momento da criação; aqui fica o sha-256.
+ */
+export const accessKeys = pgTable(
+  'access_keys',
   {
-    workspaceId: uuid('workspace_id')
+    id: uuid('id').primaryKey().defaultRandom(),
+    tokenHash: text('token_hash').notNull().unique(),
+    /** 'project' abre o project inteiro; 'collection' abre uma collection só. */
+    scope: text('scope', { enum: ['project', 'collection'] }).notNull(),
+    projectId: uuid('project_id')
       .notNull()
-      .references(() => workspaces.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    role: text('role', { enum: ['owner', 'member'] }).notNull().default('member'),
-    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    /** Preenchido só quando scope = 'collection'. */
+    collectionId: text('collection_id'),
+    role: text('role', { enum: ['write', 'read'] }).notNull().default('write'),
+    label: text('label').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
   },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.userId] })],
+  (t) => [index('access_keys_project_idx').on(t.projectId)],
 )
 
-export const invites = pgTable('invites', {
-  code: text('code').primaryKey(),
-  workspaceId: uuid('workspace_id')
-    .notNull()
-    .references(() => workspaces.id, { onDelete: 'cascade' }),
-  createdBy: uuid('created_by')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
-
-/**
- * Entidades de sync (collections, requests, environments) num formato único:
- * o payload inteiro vive em `data` (jsonb); o servidor só entende id, tipo,
- * updatedAt (pro last-write-wins) e o tombstone `deleted`.
- */
 export const entities = pgTable(
   'entities',
   {
     id: text('id').notNull(),
-    workspaceId: uuid('workspace_id')
+    projectId: uuid('project_id')
       .notNull()
-      .references(() => workspaces.id, { onDelete: 'cascade' }),
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    /**
+     * Collection raiz dona da entidade — é o filtro que uma chave de escopo
+     * 'collection' usa. A própria collection raiz aponta pro próprio id.
+     */
+    rootCollectionId: text('root_collection_id'),
     kind: text('kind', { enum: ['collection', 'request', 'environment'] }).notNull(),
     data: jsonb('data').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
@@ -67,7 +63,8 @@ export const entities = pgTable(
     syncedAt: timestamp('synced_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    primaryKey({ columns: [t.workspaceId, t.id] }),
-    index('entities_ws_synced_idx').on(t.workspaceId, t.syncedAt),
+    primaryKey({ columns: [t.projectId, t.id] }),
+    index('entities_project_synced_idx').on(t.projectId, t.syncedAt),
+    index('entities_scope_idx').on(t.projectId, t.rootCollectionId, t.syncedAt),
   ],
 )

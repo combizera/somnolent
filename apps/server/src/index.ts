@@ -8,7 +8,8 @@ import * as schema from './db/schema.js'
 
 const DATABASE_URL =
   process.env.DATABASE_URL ?? 'postgres://postgres:somnolent@localhost:5435/somnolent'
-const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-troque-em-producao'
+// Se definido, criar project exige este segredo. Vazio = criação livre (local).
+const CREATE_TOKEN = process.env['PROJECT_CREATE_TOKEN']
 const PORT = Number(process.env.PORT ?? 4000)
 
 const pool = new pg.Pool({ connectionString: DATABASE_URL })
@@ -17,6 +18,6 @@ const db = drizzle(pool, { schema })
 const migrationsFolder = join(dirname(fileURLToPath(import.meta.url)), '..', 'drizzle')
 await migrate(db, { migrationsFolder })
 
-const app = buildApp({ db, jwtSecret: JWT_SECRET })
+const app = buildApp({ db, createToken: CREATE_TOKEN })
 await app.listen({ port: PORT, host: '0.0.0.0' })
 console.log(`somnolent server em http://localhost:${PORT}`)
