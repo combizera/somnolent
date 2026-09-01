@@ -82,6 +82,9 @@ function RequestRow({
         // Uma pasta não entra dentro de uma request.
         if (!drag || drag.kind === 'collection') return
         e.preventDefault()
+        // Sem isto o <nav> recebe o mesmo evento e sobrescreve o alvo com
+        // "raiz" — é o que fazia a indicação piscar durante o arraste.
+        e.stopPropagation()
         e.dataTransfer.dropEffect = 'move'
         const next: DropSpot = { kind: 'request', id: request.id, edge: edgeOf(e) }
         if (!sameSpot(spot, next)) setSpot(next)
@@ -188,6 +191,7 @@ function FolderHeader({
       onDragOver={(e) => {
         if (!drag) return
         e.preventDefault()
+        e.stopPropagation()
         e.dataTransfer.dropEffect = 'move'
         const next = spotFor(e)
         if (!sameSpot(spot, next)) setSpot(next)
@@ -320,6 +324,7 @@ function CollectionRow({
       onDragOver={(e) => {
         if (!drag) return
         e.preventDefault()
+        e.stopPropagation()
         e.dataTransfer.dropEffect = 'move'
         const next = spotFor(e)
         if (!sameSpot(spot, next)) setSpot(next)
@@ -545,7 +550,24 @@ export function Sidebar() {
           {...dragProps}
         />
         {!isCollapsed && (
-          <div className="mt-0.5 ml-2 flex flex-col gap-0.5 border-l border-line-soft pl-2">
+          <div
+            className="mt-0.5 ml-2 flex flex-col gap-0.5 border-l border-line-soft pl-2"
+            // O corpo da pasta também aceita o drop: soltar no vão entre as
+            // linhas caía no <nav> e a request ia parar fora de qualquer pasta.
+            onDragOver={(e) => {
+              if (!drag || drag.kind !== 'request') return
+              e.preventDefault()
+              e.stopPropagation()
+              const next: DropSpot = { kind: 'collection', id: col.id, edge: 'inside' }
+              if (!sameSpot(spot, next)) setSpot(next)
+            }}
+            onDrop={(e) => {
+              if (!drag || drag.kind !== 'request') return
+              e.preventDefault()
+              e.stopPropagation()
+              handleDrop({ kind: 'collection', id: col.id, edge: 'inside' })
+            }}
+          >
             {childCols.map((child) => renderFolder(child))}
             {items.map((r) => (
               <RequestRow key={r.id} request={r} {...dragProps} />

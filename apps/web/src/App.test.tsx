@@ -165,3 +165,87 @@ describe('editores de código', () => {
     expect(container.querySelector('.cm-lineWrapping')).not.toBeNull()
   })
 })
+
+describe('arrastar request', () => {
+  /** dataTransfer mínimo: o jsdom não fornece um. */
+  const dt = () => ({ setData: () => {}, getData: () => '', effectAllowed: '', dropEffect: '' })
+
+  function cenario() {
+    const s = useStore.getState()
+    const collection = s.collections.find((c) => c.parentId === null)!
+    s.openCollection(collection.id)
+    s.addSubCollection(collection.id, 'Destino')
+    const folder = useStore.getState().collections.find((c) => c.name === 'Destino')!
+    const request = useStore.getState().requests.find((r) => r.collectionId === collection.id)!
+    return { collection, folder, request }
+  }
+
+  const requestAtual = (id: string) => useStore.getState().requests.find((r) => r.id === id)!
+
+  it('soltar sobre a pasta move a request pra dentro dela', () => {
+    const { folder, request } = cenario()
+    render(<App />)
+    const sidebar = within(screen.getByRole('complementary'))
+
+    const linha = sidebar.getByText(request.name)
+    const pasta = sidebar.getByText('Destino')
+
+    fireEvent.dragStart(linha, { dataTransfer: dt() })
+    fireEvent.dragOver(pasta, { dataTransfer: dt() })
+    fireEvent.drop(pasta, { dataTransfer: dt() })
+
+    expect(requestAtual(request.id).collectionId).toBe(folder.id)
+  })
+
+  it('passar por cima de uma linha não deixa o alvo virar a raiz', () => {
+    const { collection, folder, request } = cenario()
+    useStore.getState().expandFolders([folder.id])
+    render(<App />)
+    const sidebar = within(screen.getByRole('complementary'))
+
+    const linha = sidebar.getByText(request.name)
+    fireEvent.dragStart(linha, { dataTransfer: dt() })
+    // dragOver na pasta e depois o drop nela: se o evento subisse pro <nav>,
+    // o alvo viraria "raiz" e a request cairia em Sem pasta
+    const pasta = sidebar.getByText('Destino')
+    fireEvent.dragOver(pasta, { dataTransfer: dt() })
+    fireEvent.drop(pasta, { dataTransfer: dt() })
+
+    expect(requestAtual(request.id).collectionId).not.toBeNull()
+    expect(requestAtual(request.id).collectionId).not.toBe(collection.id)
+  })
+
+  it('soltar no vão da pasta aberta cai na pasta, não fora dela', () => {
+    const { folder, request } = cenario()
+    useStore.getState().expandFolders([folder.id])
+    render(<App />)
+    const sidebar = within(screen.getByRole('complementary'))
+
+    const linha = sidebar.getByText(request.name)
+    fireEvent.dragStart(linha, { dataTransfer: dt() })
+    // "solte aqui" só existe durante o arraste — por isso vem depois do dragStart
+    const corpo = sidebar.getByText('solte aqui').parentElement!
+    fireEvent.dragOver(corpo, { dataTransfer: dt() })
+    fireEvent.drop(corpo, { dataTransfer: dt() })
+
+    expect(requestAtual(request.id).collectionId).toBe(folder.id)
+  })
+
+  it('soltar na área vazia tira da pasta e deixa na collection aberta', () => {
+    const { collection, folder, request } = cenario()
+    useStore.getState().moveRequest(request.id, folder.id, 0)
+    // pasta nasce fechada; abrir pra a request estar na tela
+    useStore.getState().expandFolders([folder.id])
+    render(<App />)
+    const sidebar = within(screen.getByRole('complementary'))
+
+    fireEvent.dragStart(sidebar.getByText(request.name), { dataTransfer: dt() })
+    const nav = screen.getByRole('navigation')
+    fireEvent.dragOver(nav, { dataTransfer: dt() })
+    fireEvent.drop(nav, { dataTransfer: dt() })
+
+    // dentro de uma collection, "fora de pasta" é a própria collection —
+    // não a raiz do workspace
+    expect(requestAtual(request.id).collectionId).toBe(collection.id)
+  })
+})
