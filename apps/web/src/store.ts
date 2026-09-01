@@ -126,6 +126,7 @@ interface AppState {
   applyRemote: (changes: RemoteChanges, deletes: Partial<PendingDeletes>) => void
 
   addCollection: (name: string) => void
+  addSubCollection: (parentId: string, name: string) => void
   renameCollection: (id: string, name: string) => void
   deleteCollection: (id: string) => void
 
@@ -276,6 +277,22 @@ export const useStore = create<AppState>()(
           ],
         })),
 
+      addSubCollection: (parentId, name) =>
+        set((s) => ({
+          collections: [
+            ...s.collections,
+            {
+              id: uid(),
+              workspaceId: WS,
+              parentId,
+              name,
+              sortOrder: nextSort(s.collections.filter((c) => c.parentId === parentId)),
+              version: 1,
+              updatedAt: now(),
+            },
+          ],
+        })),
+
       renameCollection: (id, name) =>
         set((s) => ({
           collections: s.collections.map((c) =>
@@ -285,16 +302,26 @@ export const useStore = create<AppState>()(
 
       deleteCollection: (id) =>
         set((s) => {
-          const doomed = s.requests.filter((r) => r.collectionId === id).map((r) => r.id)
+          // Collect all descendant collection IDs (BFS)
+          const allColIds = new Set<string>()
+          const queue = [id]
+          while (queue.length > 0) {
+            const cur = queue.shift()!
+            allColIds.add(cur)
+            s.collections.filter((c) => c.parentId === cur).forEach((c) => queue.push(c.id))
+          }
+          const doomed = s.requests
+            .filter((r) => r.collectionId !== null && allColIds.has(r.collectionId))
+            .map((r) => r.id)
           return {
-            collections: s.collections.filter((c) => c.id !== id),
-            requests: s.requests.filter((r) => r.collectionId !== id),
+            collections: s.collections.filter((c) => !allColIds.has(c.id)),
+            requests: s.requests.filter((r) => !doomed.includes(r.id)),
             selectedRequestId: doomed.includes(s.selectedRequestId ?? '')
               ? null
               : s.selectedRequestId,
             pendingDeletes: {
               ...s.pendingDeletes,
-              collections: [...s.pendingDeletes.collections, id],
+              collections: [...s.pendingDeletes.collections, ...allColIds],
               requests: [...s.pendingDeletes.requests, ...doomed],
             },
           }

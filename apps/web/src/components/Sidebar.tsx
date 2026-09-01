@@ -124,6 +124,8 @@ function FolderHeader({
   col,
   collapsed,
   onToggle,
+  onAddSub,
+  depth,
   editing,
   onStartEditing,
   onStopEditing,
@@ -137,6 +139,8 @@ function FolderHeader({
   col: Collection
   collapsed: boolean
   onToggle: () => void
+  onAddSub: () => void
+  depth: number
   editing: boolean
   onStartEditing: () => void
   onStopEditing: () => void
@@ -188,7 +192,7 @@ function FolderHeader({
       {here?.edge === 'after' && <span className={`${LINE} -bottom-px`} />}
       <span
         aria-hidden
-        className="w-3 shrink-0 text-[10px] text-ink-faint transition-transform"
+        className="flex h-4 w-4 shrink-0 items-center justify-center text-sm text-ink-faint transition-transform"
         style={{ transform: collapsed ? 'rotate(-90deg)' : 'none' }}
       >
         ▾
@@ -225,6 +229,18 @@ function FolderHeader({
         >
           +
         </button>
+        {depth < 2 && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onAddSub()
+            }}
+            className="px-1 text-ink-faint hover:text-ink"
+            title="Nova subpasta"
+          >
+            ⊕
+          </button>
+        )}
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -245,6 +261,7 @@ export function Sidebar() {
   const collections = useStore((s) => s.collections)
   const requests = useStore((s) => s.requests)
   const addCollection = useStore((s) => s.addCollection)
+  const addSubCollection = useStore((s) => s.addSubCollection)
   const addRequest = useStore((s) => s.addRequest)
   const moveRequest = useStore((s) => s.moveRequest)
   const moveCollection = useStore((s) => s.moveCollection)
@@ -326,6 +343,43 @@ export function Sidebar() {
 
   const dragProps = { enabled: dndEnabled, drag, setDrag, spot, setSpot, onDrop: handleDrop }
 
+  const renderFolder = (col: Collection, depth = 0) => {
+    const items = inFolder(col.id)
+    const childCols = sortedCollections.filter((c) => c.parentId === col.id)
+    const isCollapsed = collapsed.has(col.id) && !filter
+    return (
+      <div key={col.id} className="mb-1">
+        <FolderHeader
+          col={col}
+          collapsed={isCollapsed}
+          onToggle={() => toggle(col.id)}
+          onAddSub={() => {
+            addSubCollection(col.id, 'Nova subpasta')
+            if (collapsed.has(col.id)) toggle(col.id)
+          }}
+          depth={depth}
+          editing={editingId === col.id}
+          onStartEditing={() => setEditingId(col.id)}
+          onStopEditing={() => setEditingId(null)}
+          {...dragProps}
+        />
+        {!isCollapsed && (
+          <div className="mt-0.5 ml-2 flex flex-col gap-0.5 border-l border-line-soft pl-2">
+            {childCols.map((child) => renderFolder(child, depth + 1))}
+            {items.map((r) => (
+              <RequestRow key={r.id} request={r} {...dragProps} />
+            ))}
+            {items.length === 0 && childCols.length === 0 && (
+              <p className="px-2 py-1 text-xs text-ink-faint">
+                {drag?.kind === 'request' ? 'solte aqui' : 'vazia'}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <aside className="flex h-full flex-col overflow-hidden border-r border-line bg-panel">
       <div className="flex flex-col gap-2 p-2">
@@ -374,35 +428,7 @@ export function Sidebar() {
           handleDrop({ kind: 'root' })
         }}
       >
-        {sortedCollections.map((col) => {
-          const items = inFolder(col.id)
-          const isCollapsed = collapsed.has(col.id) && !filter
-          return (
-            <div key={col.id} className="mb-1">
-              <FolderHeader
-                col={col}
-                collapsed={isCollapsed}
-                onToggle={() => toggle(col.id)}
-                editing={editingId === col.id}
-                onStartEditing={() => setEditingId(col.id)}
-                onStopEditing={() => setEditingId(null)}
-                {...dragProps}
-              />
-              {!isCollapsed && (
-                <div className="mt-0.5 ml-2 flex flex-col gap-0.5 border-l border-line-soft pl-2">
-                  {items.map((r) => (
-                    <RequestRow key={r.id} request={r} {...dragProps} />
-                  ))}
-                  {items.length === 0 && (
-                    <p className="px-2 py-1 text-xs text-ink-faint">
-                      {drag?.kind === 'request' ? 'solte aqui' : 'vazia'}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
+        {sortedCollections.filter((c) => c.parentId === null).map((col) => renderFolder(col))}
 
         <div className="flex flex-col gap-0.5">
           {sortedCollections.length > 0 && rootRequests.length > 0 && (
