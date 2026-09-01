@@ -133,7 +133,8 @@ Testes (`pnpm test`, 61 no total) **não precisam de Docker** — o server roda 
 - [x] Ver response: status, tempo, tamanho, body com highlight, headers
 - [x] CRUD de collections e requests (persistência local em localStorage)
 - [x] **Environments**: CRUD de envs e variáveis, base environment, seletor no topo com troca de env em 1 clique (+ cor de destaque da UI segue o env ativo — staging âmbar, prod vermelho)
-- [x] `{{var}}` resolvido no send + highlight das variáveis na URL/headers (verde = resolvida, vermelho = faltando) — *autocomplete ficou pro backlog*
+- [x] `{{var}}` resolvido no send + highlight das variáveis na URL/headers (verde = resolvida, vermelho = faltando)
+- [x] Autocomplete de `{{vars}}`: abrir `{{` lista as variáveis do environment (URL, headers, query params e auth; o body em CodeMirror ainda não)
 - [x] Histórico simples de responses (últimas 20 por request)
 
 ### Fase 2 — Sync e colaboração → **MVP lançável**
@@ -158,7 +159,7 @@ Testes (`pnpm test`, 61 no total) **não precisam de Docker** — o server roda 
 - [ ] Variáveis de resposta encadeadas (`{{ response.body.token }}`)
 - [ ] `tauri-plugin-http`: mandar o send pelo lado Rust no desktop e matar o CORS de vez (hoje o desktop usa o `fetch` da webview — ver aviso na §3)
 - [ ] Export do workspace pra arquivo (hoje só existe import) — resolve levar os dados pra outra máquina sem servidor
-- [ ] Autocomplete de `{{vars}}`, OAuth Google, temas, mais atalhos de teclado
+- [ ] Autocomplete de `{{vars}}` no body (CodeMirror), OAuth Google, temas, mais atalhos de teclado
 
 ### Fase 4 — Deploy (próxima)
 - [ ] Server + Postgres (Railway/Fly.io), web (Vercel/Cloudflare), releases desktop no GitHub
