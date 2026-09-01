@@ -50,7 +50,7 @@ Tokens de prod não deveriam ir pro servidor em texto puro. Pro MVP, abordagem p
 | Desktop (Linux/Win/macOS) | **Tauri v2** | Binário ~10 MB vs ~150 MB do Electron, menos RAM, empacota o mesmo app web. `bundle.targets: "all"` gera `.deb`/`.AppImage`/`.msi`/`.app`/`.dmg` — o CI bundla só Linux e Windows; macOS builda local (ver §4) |
 | Backend (sync) | **Node + Fastify + TypeScript** | Mesmo idioma do front, API pequena |
 | Banco | **PostgreSQL + Drizzle ORM** | Confiável, tipado, migrations simples |
-| Auth | **E-mail + senha com JWT** (MVP) | Sem dependência externa; OAuth Google depois |
+| Auth | **Chave de acesso por link** | Sem conta e sem senha: a chave é a credencial. Várias por project, cada uma com rótulo e papel, revogáveis uma a uma |
 | Editor de body | **CodeMirror 6** | Leve (Monaco é pesado demais pra isso), highlight de JSON e de `{{var}}` |
 | Monorepo | **pnpm workspaces** | `apps/web`, `apps/desktop`, `apps/server`, `packages/core` |
 
@@ -106,7 +106,7 @@ pnpm dev                                # web em http://localhost:5173
 pnpm desktop                            # opcional: Tauri (sobe o Vite sozinho via beforeDevCommand)
 ```
 
-**Não precisa de `.env`** — tudo tem default no código: `DATABASE_URL` (`postgres://postgres:somnolent@localhost:5435/somnolent`), `JWT_SECRET`, `PORT=4000` no server e `VITE_API_URL=http://localhost:4000` na web. Sobrescreva só se precisar.
+**Não precisa de `.env`** — tudo tem default no código: `DATABASE_URL` (`postgres://postgres:somnolent@localhost:5435/somnolent`), `PORT=4000` no server e `VITE_API_URL=http://localhost:4000` na web. Sobrescreva só se precisar. Opcional: `PROJECT_CREATE_TOKEN` fecha a criação de project (sem ele, qualquer um cria — tudo bem no local, não num deploy).
 
 Testes (`pnpm test`, 61 no total) **não precisam de Docker** — o server roda contra PGlite em memória.
 
@@ -138,8 +138,9 @@ Testes (`pnpm test`, 61 no total) **não precisam de Docker** — o server roda 
 - [x] Histórico simples de responses (últimas 20 por request)
 
 ### Fase 2 — Sync e colaboração → **MVP lançável**
-- [x] Server: auth (registro/login com JWT), CRUD de workspaces, membros por código de convite
-- [x] Sync push/pull incremental (`since`) + last-write-wins por `updatedAt` + tombstones de deleção
+- [x] Server: chaves de acesso com escopo (project ou collection) e papel (escrita ou leitura), sem contas — criar project devolve a primeira chave, `POST /keys` emite outras, `DELETE /keys/:id` revoga na hora
+- [x] Sync push/pull incremental (`since`) + last-write-wins por `updatedAt` + tombstones de deleção; o escopo vem da chave, não da URL
+- [x] Compartilhar um project inteiro ou uma collection avulsa por link (a chave viaja no fragmento, que não chega ao servidor)
 - [x] WebSocket para atualização em tempo quase-real (+ polling de 20s como fallback)
 - [x] Variáveis secretas (valor local-only — sync propaga a chave com valor vazio)
 - [x] Proxy CORS no server (`POST /proxy`, fallback automático quando o `fetch` do navegador falha — exige estar logado)
