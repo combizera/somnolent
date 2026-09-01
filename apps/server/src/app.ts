@@ -2,8 +2,8 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import websocket from '@fastify/websocket'
 import type { WebSocket } from '@fastify/websocket'
-import { and, eq, gt, isNull, or, sql } from 'drizzle-orm'
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { and, eq, gt, isNull, sql } from 'drizzle-orm'
+import { createHash, randomBytes } from 'node:crypto'
 import type { Db } from './db/index.js'
 import { accessKeys, entities, projects } from './db/schema.js'
 
@@ -70,8 +70,9 @@ export function buildApp({ db, createToken }: AppOptions) {
     }
   }
 
-  /** Derruba os sockets abertos com uma chave que acabou de ser revogada. */
-  const revokedKeys = new Set<string>()
+  // Chave dona de cada socket aberto: é o que permite derrubar, na revogação,
+  // exatamente os sockets daquela chave.
+  const socketKeys = new Map<WebSocket, string>()
 
   /** Lê a chave do header e resolve o escopo; null se inválida ou revogada. */
   async function resolveKey(raw: string | undefined): Promise<Access | null> {
@@ -252,8 +253,11 @@ export function buildApp({ db, createToken }: AppOptions) {
         .update(accessKeys)
         .set({ revokedAt: new Date() })
         .where(eq(accessKeys.id, req.params.id))
-      // derruba os sockets que estavam abertos com ela
-      revokedKeys.add(req.params.id)
+      // derruba os sockets abertos com a chave revogada — sem isto, quem foi
+      // cortado continuaria recebendo cada mudança em tempo real
+      for (const [socket, keyId] of socketKeys) {
+        if (keyId === req.params.id) socket.close(4001, 'chave revogada')
+      }
       return { revoked: true }
     },
   )
@@ -366,7 +370,11 @@ export function buildApp({ db, createToken }: AppOptions) {
         const room = rooms.get(access.projectId) ?? new Set()
         room.add(socket)
         rooms.set(access.projectId, room)
-        socket.on('close', () => room.delete(socket))
+        socketKeys.set(socket, access.keyId)
+        socket.on('close', () => {
+          room.delete(socket)
+          socketKeys.delete(socket)
+        })
       },
     )
   })
