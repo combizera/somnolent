@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { uniqueEnvName } from '@somnolent/core'
 import type { ApiRequest, Collection, Environment, HttpMethod } from '@somnolent/core'
 
 export interface HistoryEntry {
@@ -481,7 +482,14 @@ export const useStore = create<AppState>()(
                 sortOrder: r.sortOrder + reqOffset,
               })),
             ],
-            environments: [...environments, ...rest],
+            // Env importado com nome já usado entra como "staging 2", não como duplicata.
+            environments: rest.reduce(
+              (acc, env) => [
+                ...acc,
+                { ...env, name: uniqueEnvName(env.name, acc.map((e) => e.name)) },
+              ],
+              environments,
+            ),
             selectedRequestId: data.requests?.[0]?.id ?? s.selectedRequestId,
           }
         }),
@@ -494,7 +502,10 @@ export const useStore = create<AppState>()(
             {
               id,
               workspaceId: WS,
-              name: 'novo-env',
+              name: uniqueEnvName(
+                'novo-env',
+                s.environments.map((e) => e.name),
+              ),
               isBase: false,
               color: '#8b5cf6',
               variables: [],
