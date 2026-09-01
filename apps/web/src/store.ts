@@ -110,6 +110,11 @@ interface AppState {
   environments: Environment[]
   activeEnvId: string | null
   selectedRequestId: string | null
+  /**
+   * Collection aberta na sidebar (navegação em 2 níveis, como o Insomnia).
+   * É escolha local de quem navega: não sincroniza.
+   */
+  openCollectionId: string | null
   history: Record<string, HistoryEntry[]>
 
   auth: { token: string | null; email: string | null }
@@ -126,7 +131,9 @@ interface AppState {
   replaceAllData: () => void
   applyRemote: (changes: RemoteChanges, deletes: Partial<PendingDeletes>) => void
 
-  addCollection: (name: string) => void
+  addCollection: (name: string) => string
+  /** Entra numa collection (ou volta pra lista, com null). */
+  openCollection: (id: string | null) => void
   addSubCollection: (parentId: string, name: string) => void
   renameCollection: (id: string, name: string) => void
   deleteCollection: (id: string) => void
@@ -160,6 +167,7 @@ export const useStore = create<AppState>()(
     (set) => ({
       collections: [],
       history: {},
+      openCollectionId: null,
       ...seed(),
 
       auth: { token: null, email: null },
@@ -202,6 +210,7 @@ export const useStore = create<AppState>()(
           environments: [],
           activeEnvId: null,
           selectedRequestId: null,
+          openCollectionId: null,
           history: {},
           pendingDeletes: { collections: [], requests: [], environments: [] },
         }),
@@ -262,21 +271,26 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      addCollection: (name) =>
+      addCollection: (name) => {
+        const id = uid()
         set((s) => ({
           collections: [
             ...s.collections,
             {
-              id: uid(),
+              id,
               workspaceId: WS,
               parentId: null,
               name,
-              sortOrder: nextSort(s.collections),
+              sortOrder: nextSort(s.collections.filter((c) => c.parentId === null)),
               version: 1,
               updatedAt: now(),
             },
           ],
-        })),
+        }))
+        return id
+      },
+
+      openCollection: (id) => set({ openCollectionId: id }),
 
       addSubCollection: (parentId, name) =>
         set((s) => ({
@@ -320,6 +334,10 @@ export const useStore = create<AppState>()(
             selectedRequestId: doomed.includes(s.selectedRequestId ?? '')
               ? null
               : s.selectedRequestId,
+            // apagou a collection aberta (ou uma ancestral dela)? volta pra lista
+            openCollectionId: allColIds.has(s.openCollectionId ?? '')
+              ? null
+              : s.openCollectionId,
             pendingDeletes: {
               ...s.pendingDeletes,
               collections: [...s.pendingDeletes.collections, ...allColIds],

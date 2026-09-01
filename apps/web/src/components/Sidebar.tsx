@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, Copy, FolderPlus, Import, Plus, X } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  FolderPlus,
+  Import,
+  Layers,
+  Plus,
+  X,
+} from 'lucide-react'
 import type { ApiRequest, Collection } from '@somnolent/core'
 import { bySortOrder, useStore } from '../store'
 import { ImportModal } from './ImportModal'
@@ -261,6 +271,109 @@ function FolderHeader({
   )
 }
 
+/**
+ * Linha da lista de collections (o nível de topo, estilo Insomnia): clicar
+ * entra na collection em vez de expandir no mesmo aside.
+ */
+function CollectionRow({
+  col,
+  count,
+  enabled,
+  drag,
+  setDrag,
+  spot,
+  setSpot,
+  onDrop,
+}: DragProps & { col: Collection; count: number }) {
+  const openCollection = useStore((s) => s.openCollection)
+  const renameCollection = useStore((s) => s.renameCollection)
+  const deleteCollection = useStore((s) => s.deleteCollection)
+  const [editing, setEditing] = useState(false)
+
+  const here = spot?.kind === 'collection' && spot.id === col.id ? spot : null
+  const isSource = drag?.kind === 'collection' && drag.id === col.id
+
+  // Request solta em cima entra na collection; outra collection se reordena.
+  const spotFor = (e: React.DragEvent): DropSpot =>
+    drag?.kind === 'request'
+      ? { kind: 'collection', id: col.id, edge: 'inside' }
+      : { kind: 'collection', id: col.id, edge: edgeOf(e) }
+
+  return (
+    <div
+      draggable={enabled && !editing}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', col.id)
+        setDrag({ kind: 'collection', id: col.id })
+      }}
+      onDragEnd={() => {
+        setDrag(null)
+        setSpot(null)
+      }}
+      onDragOver={(e) => {
+        if (!drag) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        const next = spotFor(e)
+        if (!sameSpot(spot, next)) setSpot(next)
+      }}
+      onDrop={(e) => {
+        if (!drag) return
+        e.preventDefault()
+        e.stopPropagation()
+        onDrop(spotFor(e))
+      }}
+      onClick={() => !editing && openCollection(col.id)}
+      className={`group relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-ink-dim transition hover:bg-raised hover:text-ink ${
+        here?.edge === 'inside' ? 'bg-brand/10 ring-1 ring-brand' : ''
+      } ${isSource ? 'drag-source' : ''}`}
+    >
+      {here?.edge === 'before' && <span className={`${LINE} -top-px`} />}
+      {here?.edge === 'after' && <span className={`${LINE} -bottom-px`} />}
+      <Layers aria-hidden className="size-4 shrink-0 text-brand" />
+      {editing ? (
+        <input
+          autoFocus
+          defaultValue={col.name}
+          onClick={(e) => e.stopPropagation()}
+          onBlur={(e) => {
+            renameCollection(col.id, e.target.value.trim() || col.name)
+            setEditing(false)
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          className="min-w-0 flex-1 cursor-text rounded bg-app px-1 text-sm text-ink focus:outline-none"
+        />
+      ) : (
+        <span
+          className="min-w-0 flex-1 truncate font-medium"
+          onDoubleClick={(e) => {
+            e.stopPropagation()
+            setEditing(true)
+          }}
+          title="Clique para abrir · duplo clique para renomear"
+        >
+          {col.name}
+        </span>
+      )}
+      <span className="shrink-0 font-mono text-[10px] text-ink-faint">{count}</span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          if (confirm(`Excluir a collection "${col.name}" e todo o conteúdo dela?`))
+            deleteCollection(col.id)
+        }}
+        className="shrink-0 rounded px-1 text-ink-faint opacity-0 transition group-hover:opacity-100 hover:text-bad"
+        title="Excluir collection"
+        aria-label="Excluir collection"
+      >
+        <X className="size-3.5" />
+      </button>
+      <ChevronRight aria-hidden className="size-4 shrink-0 text-ink-faint" />
+    </div>
+  )
+}
+
 export function Sidebar() {
   const collections = useStore((s) => s.collections)
   const requests = useStore((s) => s.requests)
@@ -269,8 +382,12 @@ export function Sidebar() {
   const addRequest = useStore((s) => s.addRequest)
   const moveRequest = useStore((s) => s.moveRequest)
   const moveCollection = useStore((s) => s.moveCollection)
+  const openCollectionId = useStore((s) => s.openCollectionId)
+  const openCollection = useStore((s) => s.openCollection)
+  const renameCollection = useStore((s) => s.renameCollection)
 
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [renamingOpen, setRenamingOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const [filter, setFilter] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -288,19 +405,50 @@ export function Sidebar() {
     [collections],
   )
 
+  // A collection aberta pode não existir mais (delete remoto pelo sync, cache
+  // velho do localStorage): nesse caso a lista é o fallback.
+  const open = sortedCollections.find((c) => c.id === openCollectionId) ?? null
+  const rootCollections = sortedCollections.filter((c) => c.parentId === null)
+
+  /** Ids da collection e de todas as descendentes. */
+  const subtreeOf = (rootId: string): Set<string> => {
+    const ids = new Set<string>()
+    const queue = [rootId]
+    while (queue.length > 0) {
+      const cur = queue.shift()!
+      ids.add(cur)
+      for (const c of sortedCollections) if (c.parentId === cur) queue.push(c.id)
+    }
+    return ids
+  }
+
+  const countsByCollection = useMemo(() => {
+    const parentOf = new Map(collections.map((c) => [c.id, c.parentId]))
+    const counts = new Map<string, number>()
+    for (const r of requests) {
+      let cursor = r.collectionId
+      while (cursor) {
+        counts.set(cursor, (counts.get(cursor) ?? 0) + 1)
+        cursor = parentOf.get(cursor) ?? null
+      }
+    }
+    return counts
+  }, [collections, requests])
+
+  const q = filter.toLowerCase().trim()
+
   const visible = useMemo(() => {
-    const q = filter.toLowerCase().trim()
     const list = q
       ? requests.filter(
           (r) => r.name.toLowerCase().includes(q) || r.url.toLowerCase().includes(q),
         )
       : requests
     return [...list].sort(bySortOrder)
-  }, [filter, requests])
+  }, [q, requests])
 
   const inFolder = (id: string | null) => visible.filter((r) => r.collectionId === id)
-  const rootRequests = inFolder(null)
-  const dndEnabled = !filter.trim()
+  const looseRequests = inFolder(null)
+  const dndEnabled = !q
 
   const siblingsOf = (collectionId: string | null, excludeId: string) =>
     requests
@@ -316,14 +464,22 @@ export function Sidebar() {
 
     if (drag.kind === 'collection') {
       if (target.kind !== 'collection' || target.id === drag.id) return clear()
-      const others = sortedCollections.filter((c) => c.id !== drag.id)
+      const dragged = collections.find((c) => c.id === drag.id)
+      const anchor = collections.find((c) => c.id === target.id)
+      // Reordenar só faz sentido entre irmãs do mesmo pai.
+      if (!dragged || !anchor || dragged.parentId !== anchor.parentId) return clear()
+      const others = sortedCollections.filter(
+        (c) => c.parentId === dragged.parentId && c.id !== drag.id,
+      )
       const idx = others.findIndex((c) => c.id === target.id)
       if (idx >= 0) moveCollection(drag.id, target.edge === 'before' ? idx : idx + 1)
       return clear()
     }
 
     if (target.kind === 'root') {
-      moveRequest(drag.id, null, siblingsOf(null, drag.id).length)
+      // Dentro de uma collection, "raiz" é a própria collection aberta.
+      const destination = open?.id ?? null
+      moveRequest(drag.id, destination, siblingsOf(destination, drag.id).length)
     } else if (target.kind === 'collection') {
       // Soltar sobre a pasta manda pro fim dela.
       moveRequest(drag.id, target.id, siblingsOf(target.id, drag.id).length)
@@ -350,7 +506,8 @@ export function Sidebar() {
   const renderFolder = (col: Collection, depth = 0) => {
     const items = inFolder(col.id)
     const childCols = sortedCollections.filter((c) => c.parentId === col.id)
-    const isCollapsed = collapsed.has(col.id) && !filter
+    const isCollapsed = collapsed.has(col.id) && !q
+    if (q && items.length === 0 && childCols.length === 0) return null
     return (
       <div key={col.id} className="mb-1">
         <FolderHeader
@@ -384,38 +541,176 @@ export function Sidebar() {
     )
   }
 
+  // ── nível 1: lista de collections ────────────────────────────────────────
+  const renderCollectionList = () => {
+    const shown = q
+      ? rootCollections.filter(
+          (c) =>
+            c.name.toLowerCase().includes(q) ||
+            [...subtreeOf(c.id)].some((id) => inFolder(id).length > 0),
+        )
+      : rootCollections
+
+    return (
+      <>
+        {shown.map((col) => (
+          <CollectionRow
+            key={col.id}
+            col={col}
+            count={countsByCollection.get(col.id) ?? 0}
+            {...dragProps}
+          />
+        ))}
+
+        {looseRequests.length > 0 && (
+          <div className="mt-2 flex flex-col gap-0.5">
+            <p className="px-1 pt-1 pb-1 text-xs font-semibold text-ink-faint">
+              Sem collection
+            </p>
+            {looseRequests.map((r) => (
+              <RequestRow key={r.id} request={r} {...dragProps} />
+            ))}
+          </div>
+        )}
+
+        {shown.length === 0 && looseRequests.length === 0 && (
+          <p className="px-2 py-3 text-xs leading-relaxed text-ink-faint">
+            {q
+              ? 'Nada bate com o filtro.'
+              : 'Crie uma collection ou importe um export do Insomnia.'}
+          </p>
+        )}
+      </>
+    )
+  }
+
+  // ── nível 2: dentro de uma collection ────────────────────────────────────
+  const renderInsideCollection = (col: Collection) => {
+    const childCols = sortedCollections.filter((c) => c.parentId === col.id)
+    const direct = inFolder(col.id)
+
+    return (
+      <>
+        {childCols.map((child) => renderFolder(child))}
+
+        <div className="flex flex-col gap-0.5">
+          {childCols.length > 0 && direct.length > 0 && (
+            <p className="px-1 pt-2 pb-1 text-xs font-semibold text-ink-faint">Sem pasta</p>
+          )}
+          {direct.map((r) => (
+            <RequestRow key={r.id} request={r} {...dragProps} />
+          ))}
+        </div>
+
+        {drag?.kind === 'request' && (
+          <div
+            className={`mt-2 rounded-md border border-dashed px-2 py-3 text-center text-xs transition ${
+              spot?.kind === 'root'
+                ? 'border-brand bg-brand/10 text-ink'
+                : 'border-line text-ink-faint'
+            }`}
+          >
+            soltar direto na collection
+          </div>
+        )}
+
+        {childCols.length === 0 && direct.length === 0 && (
+          <p className="px-2 py-3 text-xs leading-relaxed text-ink-faint">
+            {q ? 'Nenhuma request bate com o filtro.' : 'Collection vazia — crie a primeira request.'}
+          </p>
+        )}
+      </>
+    )
+  }
+
   return (
     <aside className="flex h-full flex-col overflow-hidden border-r border-line bg-panel">
       <div className="flex flex-col gap-2 p-2">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => addRequest(null)}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-hi"
-          >
-            <Plus className="size-3.5" />
-            Nova request
-          </button>
-          <button
-            onClick={() => addCollection('Nova pasta')}
-            className="rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
-            title="Nova pasta"
-            aria-label="Nova pasta"
-          >
-            <FolderPlus className="size-4" />
-          </button>
-          <button
-            onClick={() => setImporting(true)}
-            className="rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
-            title="Importar do Insomnia ou de um comando curl"
-            aria-label="Importar do Insomnia ou de um comando curl"
-          >
-            <Import className="size-4" />
-          </button>
-        </div>
+        {open ? (
+          <>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  openCollection(null)
+                  setFilter('')
+                }}
+                className="rounded-md border border-line px-1.5 py-1.5 text-ink-dim transition hover:bg-raised hover:text-ink"
+                title="Voltar para as collections"
+                aria-label="Voltar para as collections"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <Layers aria-hidden className="size-4 shrink-0 text-brand" />
+              {renamingOpen ? (
+                <input
+                  autoFocus
+                  defaultValue={open.name}
+                  onBlur={(e) => {
+                    renameCollection(open.id, e.target.value.trim() || open.name)
+                    setRenamingOpen(false)
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                  className="min-w-0 flex-1 rounded bg-app px-1 py-0.5 text-sm text-ink focus:outline-none"
+                />
+              ) : (
+                <span
+                  onDoubleClick={() => setRenamingOpen(true)}
+                  className="min-w-0 flex-1 truncate text-sm font-semibold text-ink"
+                  title={`${open.name} — duplo clique para renomear`}
+                >
+                  {open.name}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => addRequest(open.id)}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-hi"
+              >
+                <Plus className="size-3.5" />
+                Nova request
+              </button>
+              <button
+                onClick={() => addSubCollection(open.id, 'Nova pasta')}
+                className="rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+                title="Nova pasta nesta collection"
+                aria-label="Nova pasta nesta collection"
+              >
+                <FolderPlus className="size-4" />
+              </button>
+              <button
+                onClick={() => setImporting(true)}
+                className="rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+                title="Importar do Insomnia ou de um comando curl"
+                aria-label="Importar do Insomnia ou de um comando curl"
+              >
+                <Import className="size-4" />
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => openCollection(addCollection('Nova collection'))}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-hi"
+            >
+              <Plus className="size-3.5" />
+              Nova collection
+            </button>
+            <button
+              onClick={() => setImporting(true)}
+              className="rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+              title="Importar do Insomnia ou de um comando curl"
+              aria-label="Importar do Insomnia ou de um comando curl"
+            >
+              <Import className="size-4" />
+            </button>
+          </div>
+        )}
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filtrar"
+          placeholder={open ? 'Filtrar requests' : 'Filtrar collections'}
           className="w-full rounded-md border border-line bg-app px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
         />
       </div>
@@ -435,34 +730,7 @@ export function Sidebar() {
           handleDrop({ kind: 'root' })
         }}
       >
-        {sortedCollections.filter((c) => c.parentId === null).map((col) => renderFolder(col))}
-
-        <div className="flex flex-col gap-0.5">
-          {sortedCollections.length > 0 && rootRequests.length > 0 && (
-            <p className="px-1 pt-2 pb-1 text-xs font-semibold text-ink-faint">Sem pasta</p>
-          )}
-          {rootRequests.map((r) => (
-            <RequestRow key={r.id} request={r} {...dragProps} />
-          ))}
-        </div>
-
-        {drag?.kind === 'request' && (
-          <div
-            className={`mt-2 rounded-md border border-dashed px-2 py-3 text-center text-xs transition ${
-              spot?.kind === 'root'
-                ? 'border-brand bg-brand/10 text-ink'
-                : 'border-line text-ink-faint'
-            }`}
-          >
-            soltar fora de qualquer pasta
-          </div>
-        )}
-
-        {visible.length === 0 && (
-          <p className="px-2 py-3 text-xs leading-relaxed text-ink-faint">
-            {filter ? 'Nenhuma request bate com o filtro.' : 'Crie sua primeira request acima.'}
-          </p>
-        )}
+        {open ? renderInsideCollection(open) : renderCollectionList()}
       </nav>
     </aside>
   )
