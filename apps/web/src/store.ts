@@ -609,7 +609,11 @@ export const useStore = create<AppState>()(
           const moved = s.collections.find((c) => c.id === id)
           if (!moved) return s
 
-          const others = s.collections.filter((c) => c.id !== id).sort(bySortOrder)
+          // Só as irmãs entram na dança: reindexar a lista global embaralharia
+          // a ordem das pastas dos outros pais (o índice vem relativo às irmãs).
+          const others = s.collections
+            .filter((c) => c.id !== id && c.parentId === moved.parentId && c.projectId === moved.projectId)
+            .sort(bySortOrder)
           const clamped = Math.max(0, Math.min(index, others.length))
           const ordered = [...others.slice(0, clamped), moved, ...others.slice(clamped)]
           const position = new Map(ordered.map((c, i) => [c.id, i]))
@@ -626,24 +630,8 @@ export const useStore = create<AppState>()(
       // Import (Insomnia/cURL): environments base extras são mesclados no base local.
       importData: (data) =>
         set((s) => {
-          const incomingBase = (data.environments ?? []).filter((e) => e.isBase)
-          const rest = (data.environments ?? []).filter((e) => !e.isBase)
-          let environments = s.environments
-          const localBase = environments.find((e) => e.isBase)
-          if (incomingBase.length > 0 && localBase) {
-            const extraVars = incomingBase
-              .flatMap((e) => e.variables)
-              .filter((v) => !localBase.variables.some((lv) => lv.key === v.key))
-            environments = environments.map((e) =>
-              e.isBase
-                ? { ...e, variables: [...e.variables, ...extraVars], version: e.version + 1, updatedAt: now() }
-                : e,
-            )
-          } else if (incomingBase.length > 0) {
-            environments = [...environments, ...incomingBase]
-          }
           // Empurra o que chega pro fim da lista, senão colide com o sortOrder local.
-          const colOffset = nextSort(s.collections)
+          const colOffset = nextSort(s.collections.filter((c) => c.parentId === null))
           const reqOffset = nextSort(s.requests)
 
           return {
@@ -651,7 +639,7 @@ export const useStore = create<AppState>()(
               ...s.collections,
               ...(data.collections ?? []).map((c) => ({
                 ...c,
-                sortOrder: c.sortOrder + colOffset,
+                sortOrder: c.parentId === null ? c.sortOrder + colOffset : c.sortOrder,
               })),
             ],
             requests: [
@@ -661,19 +649,11 @@ export const useStore = create<AppState>()(
                 sortOrder: r.sortOrder + reqOffset,
               })),
             ],
-            // Env importado com nome já usado entra como "staging 2", não como
-            // duplicata; e a ordem dele começa depois da dos locais.
-            environments: rest.reduce(
-              (acc, env) => [
-                ...acc,
-                {
-                  ...env,
-                  name: uniqueEnvName(env.name, acc.map((e) => e.name)),
-                  sortOrder: nextSort(acc),
-                },
-              ],
-              environments,
-            ),
+            // Environments chegam do importer já pendurados na collection nova,
+            // com nomes únicos dentro dela. Mesclar no base local ou renomear
+            // contra os envs das OUTRAS collections era coisa do modelo antigo
+            // (env por workspace) — hoje só corromperia o import.
+            environments: [...s.environments, ...(data.environments ?? [])],
             selectedRequestId: data.requests?.[0]?.id ?? s.selectedRequestId,
           }
         }),
