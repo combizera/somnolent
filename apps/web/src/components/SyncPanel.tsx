@@ -166,10 +166,19 @@ function Connect() {
           onClick={() =>
             void run(async () => {
               const raw = key.trim().split('#k=').pop()!.trim()
+              // Valida a chave ANTES de tocar em qualquer coisa: apagar primeiro
+              // significaria perder o workspace por causa de uma chave com typo.
+              const info = await api.me(raw)
               // Entrar num project de outra pessoa substitui o conteúdo local:
               // o primeiro pull traz tudo de lá.
               replaceAllData()
-              await apply(raw)
+              connect(raw, {
+                scope: info.scope,
+                role: info.role,
+                label: info.label,
+                projectName: info.project.name,
+                collectionId: info.collection?.id ?? null,
+              })
             })
           }
           className="w-fit rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-hi disabled:opacity-40"
@@ -316,7 +325,12 @@ function Connected() {
                   .createKey(key, {
                     label: newLabel.trim(),
                     role: newRole,
-                    collectionId: newScope || null,
+                    // chave de collection só emite chave da própria collection —
+                    // mandar null aqui fazia o servidor recusar com 403
+                    collectionId:
+                      connection.scope === 'collection'
+                        ? connection.collectionId
+                        : newScope || null,
                   })
                   .then((r) => {
                     setIssued(r.key)
