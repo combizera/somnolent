@@ -101,7 +101,7 @@ export function CommandPalette() {
               >
                 <MethodChip method={r.method} />
                 <span className="min-w-0 flex-1 truncate">{r.name}</span>
-                {folder && <span className="shrink-0 text-xs text-ink-faint">{folder}</span>}
+                {folder && <span className="shrink-0 text-sm text-ink-faint">{folder}</span>}
               </button>
             )
           })}

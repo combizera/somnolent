@@ -57,6 +57,11 @@ export interface ApiRequest {
   url: string;
   headers: KeyValue[];
   queryParams: KeyValue[];
+  /**
+   * Valores dos `:params` que aparecem na URL. A lista de nomes vem da própria
+   * URL — isto aqui só guarda o que a pessoa preencheu.
+   */
+  pathParams?: KeyValue[];
   body: string | null;
   bodyType: "none" | "json" | "text";
   /** Auth helper — gera o header Authorization no send (header manual tem precedência). */

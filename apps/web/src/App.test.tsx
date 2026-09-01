@@ -92,3 +92,48 @@ describe('pastas na sidebar', () => {
     expect(useStore.getState().expandedFolders).not.toContain(folder.id)
   })
 })
+
+describe('path params (:id)', () => {
+  /** Request limpa: sem query nem header, pra o assert falar só da URL. */
+  function abrirRequestCom(url: string) {
+    const s = useStore.getState()
+    const request = s.requests[0]!
+    s.selectRequest(request.id)
+    s.updateRequest(request.id, { url, queryParams: [], headers: [] })
+    return request.id
+  }
+
+  it('digitar :id na URL cria a linha na aba Params', () => {
+    abrirRequestCom('{{ base_url }}/api/pushes/:push_id/force')
+    render(<App />)
+    expect(screen.getByText(':push_id')).toBeDefined()
+  })
+
+  it('sem :id na URL, nenhuma linha de path param aparece', () => {
+    abrirRequestCom('{{ base_url }}/api/pushes')
+    render(<App />)
+    expect(screen.queryByText(/^:/)).toBeNull()
+  })
+
+  it('não confunde porta nem esquema com path param', () => {
+    abrirRequestCom('https://api.com:8080/v1/pushes')
+    render(<App />)
+    expect(screen.queryByText(':8080')).toBeNull()
+  })
+
+  it('preencher o valor entra na URL final mostrada', () => {
+    const id = abrirRequestCom('https://api.com/pushes/:push_id/force')
+    useStore.getState().updateRequest(id, {
+      pathParams: [{ id: 'p1', key: 'push_id', value: 'abc-123', enabled: true }],
+    })
+    render(<App />)
+    // a linha "URL final" mostra o que vai ser enviado de verdade
+    expect(screen.getByText('https://api.com/pushes/abc-123/force')).toBeDefined()
+  })
+
+  it('valor vazio é reportado como faltando, igual a {{var}} indefinida', () => {
+    abrirRequestCom('https://api.com/pushes/:push_id/force')
+    render(<App />)
+    expect(screen.getByText(/variáveis faltando: :push_id/)).toBeDefined()
+  })
+})

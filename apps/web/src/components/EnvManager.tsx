@@ -51,7 +51,7 @@ function VariableRows({ env }: { env: Environment }) {
                 ? `Já existe outra variável "${v.key}" neste environment. Só uma vale no send — renomeie ou remova a repetida.`
                 : undefined
             }
-            className={`rounded bg-transparent px-2 py-1 font-mono text-xs placeholder:text-ink-faint focus:outline-none ${
+            className={`rounded bg-transparent px-2 py-1 font-mono text-sm placeholder:text-ink-faint focus:outline-none ${
               dupeIndexes.has(i) ? 'text-bad' : 'text-ink'
             }`}
           />
@@ -62,7 +62,7 @@ function VariableRows({ env }: { env: Environment }) {
               placeholder="valor"
               spellCheck={false}
               onChange={(e) => update(i, { value: e.target.value })}
-              className="w-full rounded bg-transparent px-2 py-1 font-mono text-xs text-ink placeholder:text-ink-faint focus:outline-none"
+              className="w-full rounded bg-transparent px-2 py-1 font-mono text-sm text-ink placeholder:text-ink-faint focus:outline-none"
             />
             {v.secret && (
               <button
@@ -104,7 +104,7 @@ function VariableRows({ env }: { env: Environment }) {
         </div>
       ))}
       {dupeIndexes.size > 0 && (
-        <p className="px-1 py-0.5 text-[11px] text-bad">
+        <p className="px-1 py-0.5 text-xs text-bad">
           Chave repetida neste environment: no send só uma vale (a última). Renomeie ou remova a
           repetida.
         </p>
@@ -113,7 +113,7 @@ function VariableRows({ env }: { env: Environment }) {
         onClick={() =>
           setVars([...env.variables, { key: '', value: '', secret: false, enabled: true }])
         }
-        className="flex w-fit items-center gap-1 rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
+        className="flex w-fit items-center gap-1 rounded px-2 py-1 text-sm text-ink-faint transition hover:bg-raised hover:text-ink"
       >
         <Plus className="size-3.5" />
         variável
@@ -177,7 +177,7 @@ export function EnvManager({
             >
               Environments
             </p>
-            <p className="truncate text-[11px] text-ink-dim" title={collectionName}>
+            <p className="truncate text-xs text-ink-dim" title={collectionName}>
               {collectionName}
             </p>
           </div>
@@ -262,7 +262,7 @@ export function EnvManager({
           </div>
           <button
             onClick={() => setSelectedId(addEnvironment(collectionId))}
-            className="m-2 flex items-center justify-center gap-1 rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+            className="m-2 flex items-center justify-center gap-1 rounded-md border border-line px-2 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
           >
             <Plus className="size-3.5" />
             environment
@@ -284,14 +284,14 @@ export function EnvManager({
                   }`}
                 />
                 {dupeEnvIds.has(selected.id) && (
-                  <span className="text-[11px] text-bad">
+                  <span className="text-xs text-bad">
                     Já existe um environment com este nome.
                   </span>
                 )}
 
                 {selected.isBase ? (
                   // O base nunca é o ativo, então não tem cor de destaque nem exclusão.
-                  <p className="min-w-0 flex-1 text-xs leading-relaxed text-ink-faint">
+                  <p className="min-w-0 flex-1 text-sm leading-relaxed text-ink-faint">
                     <span className="mr-1.5 rounded bg-raised px-1.5 py-0.5 text-[10px] text-ink-dim">
                       base
                     </span>
@@ -322,7 +322,7 @@ export function EnvManager({
                           setSelectedId(environments.find((e) => e.isBase)?.id ?? null)
                         }
                       }}
-                      className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-bad/10 hover:text-bad"
+                      className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-sm text-ink-faint transition hover:bg-bad/10 hover:text-bad"
                     >
                       <Trash2 className="size-3.5" />
                       excluir

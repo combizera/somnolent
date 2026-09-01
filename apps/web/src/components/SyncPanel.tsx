@@ -67,7 +67,7 @@ function CopyField({ value, hint }: { value: string; hint: string }) {
           readOnly
           value={value}
           onFocus={(e) => e.currentTarget.select()}
-          className={`${inputClass} font-mono text-xs`}
+          className={`${inputClass} font-mono text-sm`}
         />
         <button
           onClick={() => {
@@ -75,13 +75,13 @@ function CopyField({ value, hint }: { value: string; hint: string }) {
             setCopied(true)
             setTimeout(() => setCopied(false), 1500)
           }}
-          className="flex shrink-0 items-center gap-1 rounded-md border border-line px-2.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+          className="flex shrink-0 items-center gap-1 rounded-md border border-line px-2.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
         >
           {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
           {copied ? 'copiado' : 'copiar'}
         </button>
       </div>
-      <p className="text-xs text-ink-faint">{hint}</p>
+      <p className="text-sm text-ink-faint">{hint}</p>
     </div>
   )
 }
@@ -125,7 +125,7 @@ function Connect() {
       <div className="flex flex-col gap-4">
         <div>
           <h2 className="text-sm font-semibold text-ink">Project criado</h2>
-          <p className="text-xs leading-relaxed text-ink-faint">
+          <p className="text-sm leading-relaxed text-ink-faint">
             Guarde esta chave agora: ela não aparece de novo. O servidor só armazena um hash dela.
           </p>
         </div>
@@ -145,7 +145,7 @@ function Connect() {
     <div className="flex flex-col gap-5">
       <div>
         <h2 className="text-sm font-semibold text-ink">Sync</h2>
-        <p className="text-xs leading-relaxed text-ink-faint">
+        <p className="text-sm leading-relaxed text-ink-faint">
           Sem conta e sem senha: a chave é a credencial. Variáveis secretas continuam só nesta
           máquina — nem o servidor nem quem receber o link enxerga o valor delas.
         </p>
@@ -158,7 +158,7 @@ function Connect() {
           onChange={(e) => setKey(e.target.value)}
           placeholder="cole o link ou a chave somn_…"
           spellCheck={false}
-          className={`${inputClass} font-mono text-xs`}
+          className={`${inputClass} font-mono text-sm`}
         />
         <button
           disabled={!key.trim() || busy}
@@ -189,7 +189,7 @@ function Connect() {
           value={createToken}
           onChange={(e) => setCreateToken(e.target.value)}
           placeholder="segredo do servidor (só se ele exigir)"
-          className={`${inputClass} text-xs`}
+          className={`${inputClass} text-sm`}
         />
         <button
           disabled={!name.trim() || busy}
@@ -206,7 +206,7 @@ function Connect() {
         </button>
       </div>
 
-      {error && <p className="text-xs leading-relaxed text-bad">{error}</p>}
+      {error && <p className="text-sm leading-relaxed text-bad">{error}</p>}
     </div>
   )
 }
@@ -248,12 +248,12 @@ function Connected() {
             <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[status]}`} />
             <span className="truncate">{connection.projectName}</span>
           </h2>
-          <p className="text-xs text-ink-faint">
+          <p className="text-sm text-ink-faint">
             {connection.scope === 'collection' ? 'uma collection' : 'project inteiro'} ·{' '}
             {readOnly ? 'somente leitura' : 'leitura e escrita'} · esta chave é{' '}
             <span className="text-ink-dim">{connection.label}</span>
           </p>
-          <p className="text-xs text-ink-faint">
+          <p className="text-sm text-ink-faint">
             {lastSyncAt
               ? `último sync ${new Date(lastSyncAt).toLocaleTimeString('pt-BR')}`
               : 'ainda não sincronizou'}
@@ -261,14 +261,14 @@ function Connected() {
         </div>
         <button
           onClick={() => void syncNow()}
-          className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+          className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
         >
           Sincronizar agora
         </button>
       </div>
 
       {readOnly && (
-        <p className="rounded-md border-l-2 border-warn bg-warn/10 px-3 py-2 text-xs leading-relaxed text-ink-dim">
+        <p className="rounded-md border-l-2 border-warn bg-warn/10 px-3 py-2 text-sm leading-relaxed text-ink-dim">
           Esta chave só lê. Suas edições ficam nesta máquina e não sobem — peça uma chave de
           escrita a quem compartilhou.
         </p>
@@ -287,7 +287,7 @@ function Connected() {
             <select
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as 'write' | 'read')}
-              className="rounded-md border border-line bg-app px-2 py-2 text-xs text-ink focus:border-brand focus:outline-none"
+              className="rounded-md border border-line bg-app px-2 py-2 text-sm text-ink focus:border-brand focus:outline-none"
             >
               <option value="read">só leitura</option>
               <option value="write">leitura e escrita</option>
@@ -296,7 +296,7 @@ function Connected() {
               <select
                 value={newScope}
                 onChange={(e) => setNewScope(e.target.value)}
-                className="rounded-md border border-line bg-app px-2 py-2 text-xs text-ink focus:border-brand focus:outline-none"
+                className="rounded-md border border-line bg-app px-2 py-2 text-sm text-ink focus:border-brand focus:outline-none"
               >
                 <option value="">project inteiro</option>
                 {shareable.map((c) => (
@@ -325,7 +325,7 @@ function Connected() {
                     setError(err instanceof ApiError ? err.message : 'Falha ao emitir chave.'),
                   )
               }}
-              className="flex items-center gap-1.5 rounded-md bg-brand px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-hi disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-hi disabled:opacity-40"
             >
               <Link2 className="size-3.5" />
               Gerar link
@@ -344,13 +344,13 @@ function Connected() {
 
       <div className="flex flex-col gap-2 border-t border-line pt-4">
         <p className={label}>Chaves ativas</p>
-        {keys === null && <p className="text-xs text-ink-faint">carregando…</p>}
-        {keys?.length === 0 && <p className="text-xs text-ink-faint">nenhuma chave.</p>}
+        {keys === null && <p className="text-sm text-ink-faint">carregando…</p>}
+        {keys?.length === 0 && <p className="text-sm text-ink-faint">nenhuma chave.</p>}
         <div className="flex flex-col gap-1">
           {keys?.map((k) => (
             <div
               key={k.id}
-              className="flex items-center gap-2 rounded-md border border-line-soft bg-app px-2.5 py-1.5 text-xs"
+              className="flex items-center gap-2 rounded-md border border-line-soft bg-app px-2.5 py-1.5 text-sm"
             >
               <KeyRound aria-hidden className="size-3.5 shrink-0 text-ink-faint" />
               <span className="min-w-0 flex-1 truncate text-ink">{k.label}</span>
@@ -392,11 +392,11 @@ function Connected() {
         </div>
       </div>
 
-      {error && <p className="text-xs text-bad">{error}</p>}
+      {error && <p className="text-sm text-bad">{error}</p>}
 
       <button
         onClick={disconnect}
-        className="w-fit border-t border-line pt-4 text-xs text-ink-faint transition hover:text-bad"
+        className="w-fit border-t border-line pt-4 text-sm text-ink-faint transition hover:text-bad"
       >
         Desconectar esta máquina
       </button>
@@ -416,7 +416,7 @@ export function SyncPanel() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-md border border-line bg-panel px-2.5 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+        className="flex items-center gap-2 rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
         title="Sync e compartilhamento"
       >
         <span className={`size-2 rounded-full ${STATUS_DOT[status]}`} />

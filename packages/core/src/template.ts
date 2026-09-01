@@ -61,6 +61,42 @@ export function extractVariables(template: string): string[] {
   return names;
 }
 
+/**
+ * `:param` na URL, estilo Insomnia. Exige letra ou `_` no começo pra não
+ * confundir com `https://` nem com porta (`:8080`).
+ */
+const PATH_PARAM = /:([A-Za-z_][\w-]*)/g;
+
+/** Nomes dos path params citados na URL, na ordem, sem repetir. */
+export function extractPathParams(url: string): string[] {
+  const names: string[] = [];
+  for (const match of url.matchAll(PATH_PARAM)) {
+    const name = match[1];
+    if (name !== undefined && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+/**
+ * Troca cada `:param` pelo valor preenchido. Param sem valor fica visível na
+ * URL e é reportado como faltando — mesmo tratamento de `{{var}}` indefinida.
+ */
+export function applyPathParams(
+  url: string,
+  values: Record<string, string>,
+): ResolveResult {
+  const missing: string[] = [];
+  const output = url.replace(PATH_PARAM, (match, name: string) => {
+    const value = values[name];
+    if (value === undefined || value === "") {
+      if (!missing.includes(`:${name}`)) missing.push(`:${name}`);
+      return match;
+    }
+    return encodeURIComponent(value);
+  });
+  return { output, missing };
+}
+
 export interface ResolvedRequest {
   method: ApiRequest["method"];
   url: string;
@@ -99,8 +135,16 @@ export function resolveRequest(
   const url = resolveTemplate(request.url, ctx);
   for (const m of url.missing) missing.add(m);
 
+  // `:param` é resolvido depois do template: o valor de um {{var}} pode conter
+  // o `:param`, mas nunca o contrário.
+  const pathValues = Object.fromEntries(
+    resolvePairs(request.pathParams ?? [], ctx, missing).map(({ key, value }) => [key, value]),
+  );
+  const withPath = applyPathParams(url.output, pathValues);
+  for (const m of withPath.missing) missing.add(m);
+
   const query = resolvePairs(request.queryParams, ctx, missing);
-  let finalUrl = url.output;
+  let finalUrl = withPath.output;
   if (query.length > 0) {
     const qs = new URLSearchParams(
       query.map(({ key, value }) => [key, value]),

@@ -4,11 +4,13 @@ import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import {
   buildContext,
+  extractPathParams,
   resolveRequest,
   resolveTemplate,
   toCurl,
   type ApiRequest,
   type HttpMethod,
+  type KeyValue,
   type RequestAuth,
 } from '@somnolent/core'
 import { useActiveEnv, useBaseEnv, useStore } from '../store'
@@ -65,6 +67,67 @@ function AuthField({
   )
 }
 
+/**
+ * Linhas dos `:params` da URL. A lista de nomes é derivada da própria URL —
+ * digitou `:push_id`, a linha aparece; apagou, ela some. Só o valor é editável,
+ * porque o nome vive na URL.
+ */
+function PathParams({
+  names,
+  values,
+  onChange,
+  ctx,
+}: {
+  names: string[]
+  values: KeyValue[]
+  onChange: (values: KeyValue[]) => void
+  ctx: Record<string, string>
+}) {
+  const valueOf = (name: string) => values.find((v) => v.key === name)?.value ?? ''
+
+  const setValue = (name: string, value: string) => {
+    const existe = values.some((v) => v.key === name)
+    onChange(
+      existe
+        ? values.map((v) => (v.key === name ? { ...v, value } : v))
+        : [...values, { id: crypto.randomUUID(), key: name, value, enabled: true }],
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="grid grid-cols-[1fr_1.5fr] items-center gap-1 px-1 pb-0.5 text-[10px] tracking-wider text-ink-faint uppercase">
+        <span>path param</span>
+        <span>valor</span>
+      </div>
+      {names.map((name) => {
+        const preenchido = valueOf(name).trim() !== ''
+        return (
+          <div
+            key={name}
+            className={`grid grid-cols-[1fr_1.5fr] items-center gap-1 rounded-md border bg-app transition ${
+              preenchido ? 'border-line-soft hover:border-line' : 'border-bad/40'
+            }`}
+          >
+            <span
+              className="truncate px-3 py-2 font-mono text-sm text-brand-hi"
+              title="O nome vem da URL — edite lá para renomear"
+            >
+              :{name}
+            </span>
+            <TemplateInput
+              value={valueOf(name)}
+              onChange={(value) => setValue(name, value)}
+              ctx={ctx}
+              placeholder="valor que entra na URL"
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function AuthEditor({
   auth,
   onChange,
@@ -107,7 +170,7 @@ function AuthEditor({
           <select
             value={auth.type}
             onChange={(e) => onChange({ ...auth, type: e.target.value as RequestAuth['type'] })}
-            className="cursor-pointer appearance-none rounded-md border border-line bg-app py-1.5 pr-8 pl-3 text-xs font-medium text-ink focus:border-brand focus:outline-none"
+            className="cursor-pointer appearance-none rounded-md border border-line bg-app py-1.5 pr-8 pl-3 text-sm font-medium text-ink focus:border-brand focus:outline-none"
           >
             {(['none', 'bearer', 'basic'] as const).map((t) => (
               <option key={t} value={t}>
@@ -123,7 +186,7 @@ function AuthEditor({
       </div>
 
       {auth.type === 'none' && (
-        <p className="rounded-md border border-dashed border-line px-3 py-4 text-center text-xs leading-relaxed text-ink-faint">
+        <p className="rounded-md border border-dashed border-line px-3 py-4 text-center text-sm leading-relaxed text-ink-faint">
           Esta request vai sem header <span className="font-mono">Authorization</span>.
           <br />
           Escolha um tipo acima, ou escreva o header na aba Headers.
@@ -167,12 +230,12 @@ function AuthEditor({
             </span>
             <div className="flex min-w-0 items-center gap-1 rounded-md border border-line-soft bg-app px-3 py-1.5">
               {preview.missing.length > 0 ? (
-                <p className="min-w-0 flex-1 font-mono text-xs text-bad">
+                <p className="min-w-0 flex-1 font-mono text-sm text-bad">
                   variáveis faltando: {preview.missing.join(', ')}
                 </p>
               ) : (
                 <>
-                  <p className="min-w-0 flex-1 truncate font-mono text-xs text-ink-dim">
+                  <p className="min-w-0 flex-1 truncate font-mono text-sm text-ink-dim">
                     <span className="text-ink-faint">Authorization: </span>
                     {revealed ? preview.text : preview.text.replace(/\S/g, '•').slice(0, 44)}
                   </p>
@@ -188,7 +251,7 @@ function AuthEditor({
               )}
             </div>
           </div>
-          <p className="pl-[100px] text-xs text-ink-faint">
+          <p className="pl-[100px] text-sm text-ink-faint">
             Um header <span className="font-mono">Authorization</span> manual na aba Headers tem
             precedência.
           </p>
@@ -208,6 +271,8 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
   const setSending = useSession((s) => s.setSending)
   const sending = useSession((s) => s.sending[request.id] ?? false)
   const [tab, setTab] = useState<Tab>('params')
+  // Os :params vêm da URL, não de um cadastro à parte.
+  const pathNames = extractPathParams(request.url)
   const [copied, setCopied] = useState(false)
 
   const ctx = buildContext(base, active)
@@ -267,7 +332,12 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
   }
 
   const tabs: { id: Tab; label: string; count?: number; dot?: boolean }[] = [
-    { id: 'params', label: 'Query', count: request.queryParams.filter((p) => p.enabled).length },
+    {
+      id: 'params',
+      label: 'Params',
+      count:
+        request.queryParams.filter((p) => p.enabled).length + pathNames.length,
+    },
     { id: 'headers', label: 'Headers', count: request.headers.filter((h) => h.enabled).length },
     { id: 'auth', label: 'Auth', dot: !!request.auth && request.auth.type !== 'none' },
     { id: 'body', label: 'Body', dot: request.bodyType !== 'none' },
@@ -276,7 +346,7 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
   return (
     <section className="flex h-full min-w-0 flex-col bg-panel">
       {/* trilha: pasta › nome da request */}
-      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-line px-3 text-xs">
+      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-line px-3 text-sm">
         {folder && (
           <>
             <span className="text-ink-faint">{folder}</span>
@@ -299,7 +369,7 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
             <select
               value={request.method}
               onChange={(e) => updateRequest(request.id, { method: e.target.value as HttpMethod })}
-              className={`h-full cursor-pointer appearance-none bg-transparent py-2 pr-7 pl-3 font-mono text-xs font-bold focus:outline-none ${METHOD_TEXT[request.method]}`}
+              className={`h-full cursor-pointer appearance-none bg-transparent py-2 pr-7 pl-3 font-mono text-sm font-bold focus:outline-none ${METHOD_TEXT[request.method]}`}
             >
               {METHODS.map((m) => (
                 <option key={m}>{m}</option>
@@ -337,7 +407,7 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
           <span className="shrink-0 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
             URL final
           </span>
-          <span className="min-w-0 flex-1 truncate font-mono text-xs">
+          <span className="min-w-0 flex-1 truncate font-mono text-sm">
             {resolved.missing.length > 0 ? (
               <span className="text-bad">
                 variáveis faltando: {resolved.missing.join(', ')}
@@ -350,7 +420,7 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
           </span>
           <button
             onClick={copyCurl}
-            className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-ink-faint transition hover:bg-raised hover:text-ink"
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
             title="Copiar como comando curl (com variáveis resolvidas)"
           >
             {copied ? (
@@ -365,19 +435,13 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
         </div>
       </div>
 
-      {request.description && (
-        <p className="mx-3 -mt-1 mb-2 border-l-2 border-line pl-2 text-xs leading-relaxed text-ink-faint">
-          {request.description}
-        </p>
-      )}
-
       {/* abas */}
       <div className="flex shrink-0 gap-4 border-b border-line px-4">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`-mb-px flex items-center gap-1.5 border-b-2 py-2 text-xs font-medium transition ${
+            className={`-mb-px flex items-center gap-1.5 border-b-2 py-2 text-sm font-medium transition ${
               tab === t.id
                 ? 'border-brand text-ink'
                 : 'border-transparent text-ink-dim hover:text-ink'
@@ -396,12 +460,22 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {tab === 'params' && (
-          <KeyValueEditor
-            items={request.queryParams}
-            onChange={(queryParams) => updateRequest(request.id, { queryParams })}
-            ctx={ctx}
-            keyPlaceholder="param"
-          />
+          <div className="flex flex-col gap-5">
+            {pathNames.length > 0 && (
+              <PathParams
+                names={pathNames}
+                values={request.pathParams ?? []}
+                onChange={(pathParams) => updateRequest(request.id, { pathParams })}
+                ctx={ctx}
+              />
+            )}
+            <KeyValueEditor
+              items={request.queryParams}
+              onChange={(queryParams) => updateRequest(request.id, { queryParams })}
+              ctx={ctx}
+              keyPlaceholder="query param"
+            />
+          </div>
         )}
         {tab === 'headers' && (
           <KeyValueEditor
@@ -431,7 +505,7 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
                         body: bt === 'none' ? null : (request.body ?? ''),
                       })
                     }
-                    className={`rounded px-3 py-1 text-xs transition ${
+                    className={`rounded px-3 py-1 text-sm transition ${
                       request.bodyType === bt ? 'bg-raised text-ink' : 'text-ink-dim hover:text-ink'
                     }`}
                   >
@@ -450,7 +524,7 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
                       /* JSON inválido (ou com {{vars}}): mantém como está */
                     }
                   }}
-                  className="ml-auto rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
+                  className="ml-auto rounded px-2 py-1 text-sm text-ink-faint transition hover:bg-raised hover:text-ink"
                 >
                   formatar
                 </button>
@@ -468,7 +542,7 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
                 />
               </div>
             ) : (
-              <p className="text-xs text-ink-faint">Esta request não envia body.</p>
+              <p className="text-sm text-ink-faint">Esta request não envia body.</p>
             )}
           </div>
         )}

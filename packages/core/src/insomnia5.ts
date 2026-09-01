@@ -91,33 +91,6 @@ function toKeyValues(pairs: V5Pair[] | undefined, makeId: () => string): KeyValu
     }));
 }
 
-const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/**
- * O Insomnia usa `:id` na URL com o valor guardado à parte. A gente não tem
- * path params, então substitui o valor direto. Sem valor, o `:id` fica visível
- * pra pessoa preencher.
- */
-function applyPathParams(
-  url: string,
-  pathParameters: V5Pair[] | undefined,
-  requestName: string,
-  warnings: string[],
-): string {
-  let out = url;
-  for (const p of pathParameters ?? []) {
-    const name = (p.name ?? "").trim();
-    if (!name) continue;
-    const value = typeof p.value === "string" ? p.value.trim() : String(p.value ?? "").trim();
-    if (!value) {
-      warnings.push(`"${requestName}": o path param :${name} estava vazio e ficou na URL.`);
-      continue;
-    }
-    out = out.replace(new RegExp(`:${escapeRegex(name)}(?![\\w-])`, "g"), value);
-  }
-  return out;
-}
-
 /**
  * Importa um export v5 do Insomnia (arquivo YAML, `type: collection.insomnia.rest/5.0`).
  * Todo o export entra dentro de UMA collection nomeada pelo documento, e as
@@ -177,12 +150,8 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
       }
 
       const name = node.name?.trim() || "Request importada";
-      const url = applyPathParams(
-        convertTemplates(node.url ?? ""),
-        node.pathParameters,
-        name,
-        warnings,
-      );
+      // `:id` continua na URL: quem guarda o valor é `pathParams`.
+      const url = convertTemplates(node.url ?? "");
 
       const request: ApiRequest = {
         id: makeId(),
@@ -193,6 +162,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
         url,
         headers: toKeyValues(node.headers, makeId),
         queryParams: toKeyValues(node.parameters, makeId),
+        pathParams: toKeyValues(node.pathParameters, makeId),
         body: node.body?.text ? convertTemplates(node.body.text) : null,
         bodyType: node.body?.text
           ? node.body.mimeType?.includes("json")

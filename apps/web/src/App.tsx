@@ -36,7 +36,7 @@ function App() {
               new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
             )
           }}
-          className="hidden min-w-64 items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-xs text-ink-faint transition hover:border-line hover:bg-raised md:flex"
+          className="hidden min-w-64 items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-sm text-ink-faint transition hover:border-line hover:bg-raised md:flex"
         >
           <Search aria-hidden className="size-3.5 shrink-0" />
           <span className="flex-1 text-left">Buscar request…</span>

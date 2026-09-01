@@ -65,25 +65,25 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
   return (
     <section className="flex h-full min-w-0 flex-col border-l border-line bg-panel">
       {/* barra de status */}
-      <header className="flex h-9 shrink-0 items-center gap-2 border-b border-line px-3 text-xs">
+      <header className="flex h-9 shrink-0 items-center gap-2 border-b border-line px-3 text-sm">
         {sending && <span className="animate-pulse text-ink-dim">enviando…</span>}
         {!sending && view && (
           <>
             <span
-              className={`rounded px-2 py-0.5 font-mono text-[11px] font-bold ${statusChip(view.status)}`}
+              className={`rounded px-2 py-0.5 font-mono text-xs font-bold ${statusChip(view.status)}`}
             >
               {view.status} {view.statusText}
             </span>
-            <span className="rounded bg-raised px-2 py-0.5 font-mono text-[11px] text-ink-dim">
+            <span className="rounded bg-raised px-2 py-0.5 font-mono text-xs text-ink-dim">
               {formatTime(view.timeMs)}
             </span>
-            <span className="rounded bg-raised px-2 py-0.5 font-mono text-[11px] text-ink-dim">
+            <span className="rounded bg-raised px-2 py-0.5 font-mono text-xs text-ink-dim">
               {formatSize(view.sizeBytes)}
             </span>
             {viewingEntry && (
               <button
                 onClick={() => setViewingId(null)}
-                className="ml-auto flex items-center gap-1 rounded bg-raised px-2 py-0.5 text-[11px] text-ink-dim transition hover:text-ink"
+                className="ml-auto flex items-center gap-1 rounded bg-raised px-2 py-0.5 text-xs text-ink-dim transition hover:text-ink"
                 title="Voltar para a response mais recente"
               >
                 vendo histórico
@@ -93,7 +93,7 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
           </>
         )}
         {!sending && !view && response && !response.ok && (
-          <span className="rounded bg-bad/20 px-2 py-0.5 font-mono text-[11px] font-bold text-bad">
+          <span className="rounded bg-bad/20 px-2 py-0.5 font-mono text-xs font-bold text-bad">
             falhou
           </span>
         )}
@@ -115,7 +115,7 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`-mb-px flex items-center gap-1.5 border-b-2 py-2 text-xs font-medium transition ${
+                className={`-mb-px flex items-center gap-1.5 border-b-2 py-2 text-sm font-medium transition ${
                   tab === t.id
                     ? 'border-brand text-ink'
                     : 'border-transparent text-ink-dim hover:text-ink'
@@ -157,7 +157,7 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
             {tab === 'headers' && (
               <div className="p-3">
                 {view && view.headers.length > 0 ? (
-                  <table className="w-full font-mono text-xs">
+                  <table className="w-full font-mono text-sm">
                     <tbody>
                       {view.headers.map((h, i) => (
                         <tr key={i} className="border-b border-line-soft">
@@ -191,7 +191,7 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
                             setViewingId(h.id)
                             setTab('body')
                           }}
-                          className={`flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left font-mono text-xs transition ${
+                          className={`flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left font-mono text-sm transition ${
                             viewingId === h.id
                               ? 'border-brand/50 bg-raised'
                               : 'border-line-soft bg-app hover:bg-raised'
@@ -213,7 +213,7 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
                         clearHistory(requestId)
                         setViewingId(null)
                       }}
-                      className="mt-3 rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
+                      className="mt-3 rounded px-2 py-1 text-sm text-ink-faint transition hover:bg-raised hover:text-ink"
                     >
                       limpar histórico
                     </button>

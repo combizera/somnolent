@@ -74,7 +74,7 @@ export function KeyValueEditor({
       ))}
       <button
         onClick={add}
-        className="flex w-fit items-center gap-1 rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
+        className="flex w-fit items-center gap-1 rounded px-2 py-1 text-sm text-ink-faint transition hover:bg-raised hover:text-ink"
       >
         <Plus className="size-3.5" />
         adicionar

@@ -89,7 +89,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           <>
             <div>
               <h2 className="text-sm font-semibold text-ink">Importado</h2>
-              <p className="text-xs text-ink-faint">{summary.format}</p>
+              <p className="text-sm text-ink-faint">{summary.format}</p>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
@@ -112,10 +112,10 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
 
             {summary.warnings.length > 0 && (
               <div className="flex flex-col gap-1.5 rounded-md border border-warn/40 bg-warn/10 p-3">
-                <p className="text-xs font-semibold text-warn">Vale conferir</p>
+                <p className="text-sm font-semibold text-warn">Vale conferir</p>
                 <ul className="flex flex-col gap-1">
                   {summary.warnings.map((w, i) => (
-                    <li key={i} className="text-xs leading-relaxed text-ink-dim">
+                    <li key={i} className="text-sm leading-relaxed text-ink-dim">
                       {w}
                     </li>
                   ))}
@@ -134,7 +134,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           <>
             <div>
               <h2 className="text-sm font-semibold text-ink">Importar</h2>
-              <p className="text-xs text-ink-faint">
+              <p className="text-sm text-ink-faint">
                 Cole um export do Insomnia — <span className="text-ink-dim">v5 (YAML)</span> ou{' '}
                 <span className="text-ink-dim">v4 (JSON)</span> — ou um{' '}
                 <span className="text-ink-dim">comando curl</span>. O formato é detectado
@@ -148,9 +148,9 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
               placeholder={
                 'type: collection.insomnia.rest/5.0\nname: Minha API\ncollection:\n  - url: ...\n\nou\n\ncurl -X POST https://api.com/login -d \'{...}\''
               }
-              className="h-56 w-full resize-none rounded-md border border-line bg-app p-3 font-mono text-xs text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
+              className="h-56 w-full resize-none rounded-md border border-line bg-app p-3 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
             />
-            {error && <p className="text-xs leading-relaxed text-bad">{error}</p>}
+            {error && <p className="text-sm leading-relaxed text-bad">{error}</p>}
             <div className="flex justify-end gap-2">
               <button
                 onClick={onClose}

@@ -96,7 +96,7 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
       <div
         ref={overlayRef}
         aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden px-3 py-2 font-mono text-xs leading-5 whitespace-pre text-ink"
+        className="pointer-events-none absolute inset-0 overflow-hidden px-3 py-2 font-mono text-sm leading-5 whitespace-pre text-ink"
       >
         {parts}
       </div>
@@ -139,7 +139,7 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
-        className="w-full bg-transparent px-3 py-2 font-mono text-xs leading-5 text-transparent caret-ink placeholder:text-ink-faint focus:outline-none"
+        className="w-full bg-transparent px-3 py-2 font-mono text-sm leading-5 text-transparent caret-ink placeholder:text-ink-faint focus:outline-none"
       />
 
       {open &&
@@ -168,7 +168,7 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
                     accept(name)
                   }}
                   onMouseEnter={() => setHighlighted(i)}
-                  className={`flex w-full items-baseline gap-1 px-2.5 py-1.5 text-left font-mono text-xs whitespace-pre transition ${
+                  className={`flex w-full items-baseline gap-1 px-2.5 py-1.5 text-left font-mono text-sm whitespace-pre transition ${
                     i === highlighted ? 'bg-hover text-ink' : 'text-ink-dim'
                   }`}
                 >

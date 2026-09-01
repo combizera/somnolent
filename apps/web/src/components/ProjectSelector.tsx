@@ -33,7 +33,7 @@ export function ProjectSelector() {
               setEditing(false)
             }}
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-            className="w-32 rounded bg-app px-1 py-0.5 text-xs font-medium text-ink focus:outline-none"
+            className="w-32 rounded bg-app px-1 py-0.5 text-sm font-medium text-ink focus:outline-none"
           />
         ) : (
           <div className="relative flex items-center">
@@ -41,7 +41,7 @@ export function ProjectSelector() {
               value={open.id}
               onChange={(e) => openProject(e.target.value)}
               onDoubleClick={() => setEditing(true)}
-              className="cursor-pointer appearance-none bg-transparent py-1.5 pr-6 pl-0 text-xs font-medium text-ink focus:outline-none"
+              className="cursor-pointer appearance-none bg-transparent py-1.5 pr-6 pl-0 text-sm font-medium text-ink focus:outline-none"
               title="Project aberto — duplo clique para renomear"
             >
               {sorted.map((p) => (

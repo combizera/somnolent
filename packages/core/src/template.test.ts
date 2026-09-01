@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildContext,
+  applyPathParams,
   completeToken,
+  extractPathParams,
   extractVariables,
   findOpenToken,
   rankVariables,
@@ -268,5 +270,96 @@ describe("rankVariables", () => {
 
   it("devolve vazio quando nada bate", () => {
     expect(rankVariables(vars, "xyz")).toEqual([]);
+  });
+});
+
+describe("path params (:id)", () => {
+  it("acha os nomes citados na URL, sem repetir", () => {
+    expect(extractPathParams("{{ base_url }}/api/pushes/:push_id/force")).toEqual(["push_id"]);
+    expect(extractPathParams("/a/:x/b/:y/c/:x")).toEqual(["x", "y"]);
+  });
+
+  it("não confunde com esquema nem com porta", () => {
+    expect(extractPathParams("https://api.com:8080/v1/coisas")).toEqual([]);
+  });
+
+  it("substitui o valor preenchido, escapando o que precisa", () => {
+    const out = applyPathParams("/lawsuits/:cnj/movements", { cnj: "0000832-55.2024.4.01.3202" });
+    expect(out.output).toBe("/lawsuits/0000832-55.2024.4.01.3202/movements");
+    expect(out.missing).toEqual([]);
+  });
+
+  it("escapa barra no valor pra não inventar segmento de rota", () => {
+    expect(applyPathParams("/oab/:oab", { oab: "511107/SP" }).output).toBe("/oab/511107%2FSP");
+  });
+
+  it("param vazio continua visível e vira aviso", () => {
+    const out = applyPathParams("/pushes/:push_id/force", { push_id: "" });
+    expect(out.output).toBe("/pushes/:push_id/force");
+    expect(out.missing).toEqual([":push_id"]);
+  });
+
+  it("resolveRequest junta {{var}}, :param e query na ordem certa", () => {
+    const env = makeEnv("local", { base_url: "https://api.com" });
+    const request: ApiRequest = {
+      id: "r1",
+      projectId: "prj-1",
+      collectionId: "c1",
+      name: "force",
+      method: "POST",
+      url: "{{ base_url }}/api/pushes/:push_id/force",
+      headers: [],
+      queryParams: [{ id: "q1", key: "dry_run", value: "true", enabled: true }],
+      pathParams: [{ id: "p1", key: "push_id", value: "abc-123", enabled: true }],
+      body: null,
+      bodyType: "none",
+      sortOrder: 0,
+      version: 1,
+      updatedAt: "2026-09-01T00:00:00.000Z",
+    };
+    const out = resolveRequest(request, null, env);
+    expect(out.url).toBe("https://api.com/api/pushes/abc-123/force?dry_run=true");
+    expect(out.missing).toEqual([]);
+  });
+
+  it("path param faltando aparece em missing, como {{var}} indefinida", () => {
+    const request: ApiRequest = {
+      id: "r2",
+      projectId: "prj-1",
+      collectionId: "c1",
+      name: "force",
+      method: "POST",
+      url: "https://api.com/pushes/:push_id/force",
+      headers: [],
+      queryParams: [],
+      pathParams: [],
+      body: null,
+      bodyType: "none",
+      sortOrder: 0,
+      version: 1,
+      updatedAt: "2026-09-01T00:00:00.000Z",
+    };
+    expect(resolveRequest(request, null, null).missing).toEqual([":push_id"]);
+  });
+
+  it("o valor do path param também aceita {{var}}", () => {
+    const env = makeEnv("local", { tenant: "advbox" });
+    const request: ApiRequest = {
+      id: "r3",
+      projectId: "prj-1",
+      collectionId: "c1",
+      name: "x",
+      method: "GET",
+      url: "https://api.com/:tenant/lawyers",
+      headers: [],
+      queryParams: [],
+      pathParams: [{ id: "p1", key: "tenant", value: "{{ tenant }}", enabled: true }],
+      body: null,
+      bodyType: "none",
+      sortOrder: 0,
+      version: 1,
+      updatedAt: "2026-09-01T00:00:00.000Z",
+    };
+    expect(resolveRequest(request, null, env).url).toBe("https://api.com/advbox/lawyers");
   });
 });

@@ -77,22 +77,27 @@ describe("importInsomniaExport — arquivo real do Insomnia v5", () => {
     expect(account.auth).toEqual({ type: "bearer", token: "{{ token_staging }}" });
   });
 
-  it("substitui path params pelo valor guardado", () => {
+  it("guarda os path params em pathParams, deixando o :id na URL", () => {
     const detail = result.requests.find((r) => r.name === "List Tracker Detail")!;
-    expect(detail.url).toBe("{{ base_url }}/trackers/8684");
+    // a URL preserva o :id — quem resolve é o valor, na hora do send
+    expect(detail.url).toBe("{{ base_url }}/trackers/:id");
+    expect(detail.pathParams).toEqual([
+      expect.objectContaining({ key: "id", value: "8684", enabled: true }),
+    ]);
 
     const update = result.requests.find((r) => r.name === "Update Tracker")!;
-    expect(update.url).toBe("{{ base_url }}/trackers/1164");
+    expect(update.pathParams?.[0]).toMatchObject({ key: "id", value: "1164" });
   });
 
-  it("path param vazio permanece na URL e vira aviso", () => {
+  it("path param sem valor entra vazio, pra pessoa preencher na aba Params", () => {
     const byTracker = result.requests.find(
       (r) => r.name === "List Intimations by Tracker",
     )!;
     expect(byTracker.url).toBe("{{ base_url }}/trackers/:id/communications");
-    expect(result.warnings.some((w) => w.includes("List Intimations by Tracker"))).toBe(
-      true,
-    );
+    // sem aviso: campo vazio é estado normal agora, e a UI marca em vermelho
+    expect(byTracker.pathParams).toEqual([
+      expect.objectContaining({ key: "id", value: "" }),
+    ]);
   });
 
   it("preserva query params desabilitados", () => {

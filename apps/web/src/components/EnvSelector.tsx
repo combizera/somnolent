@@ -39,7 +39,7 @@ export function EnvSelector() {
             value={activeEnvId ?? ''}
             onChange={(e) => collectionId && setActiveEnv(collectionId, e.target.value || null)}
             disabled={!collectionId}
-            className="cursor-pointer appearance-none bg-transparent py-1.5 pr-6 pl-0 text-xs font-medium text-ink focus:outline-none disabled:cursor-not-allowed disabled:text-ink-faint"
+            className="cursor-pointer appearance-none bg-transparent py-1.5 pr-6 pl-0 text-sm font-medium text-ink focus:outline-none disabled:cursor-not-allowed disabled:text-ink-faint"
             title={
               collectionId
                 ? 'Environment ativo — troca URL, token e todas as variáveis'
@@ -62,7 +62,7 @@ export function EnvSelector() {
       <button
         onClick={() => setManaging(true)}
         disabled={!collectionId}
-        className="flex items-center gap-1.5 bg-panel px-2.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+        className="flex items-center gap-1.5 bg-panel px-2.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
         title="Gerenciar environments e variáveis"
       >
         <SlidersHorizontal className="size-3.5" />
