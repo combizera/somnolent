@@ -10,7 +10,7 @@ import type { Environment, EnvironmentVariable } from "./types.js";
 function makeEnv(id: string, name: string): Environment {
   return {
     id,
-    workspaceId: "ws-1",
+    collectionId: "col-1",
     name,
     isBase: false,
     variables: [],

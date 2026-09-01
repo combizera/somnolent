@@ -6,7 +6,7 @@ import type { ApiRequest } from "./types.js";
 
 let counter = 0;
 const opts = {
-  workspaceId: "ws-1",
+  projectId: "prj-1",
   makeId: () => `id-${++counter}`,
   now: () => "2026-08-04T00:00:00.000Z",
 };
@@ -167,7 +167,7 @@ describe("parseCurl", () => {
 describe("toCurl + auth helper", () => {
   const request: ApiRequest = {
     id: "r1",
-    workspaceId: "ws-1",
+    projectId: "prj-1",
     collectionId: null,
     name: "x",
     method: "POST",
@@ -183,7 +183,7 @@ describe("toCurl + auth helper", () => {
   };
   const env = {
     id: "e1",
-    workspaceId: "ws-1",
+    collectionId: "col-1",
     name: "stg",
     isBase: false,
     variables: [{ key: "token", value: "tok-123", secret: true, enabled: true }],

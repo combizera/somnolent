@@ -48,14 +48,14 @@ function toKeyValues(
  */
 export function importInsomnia(
   json: unknown,
-  opts: { workspaceId: string; makeId: () => string; now: () => string },
+  opts: { projectId: string; makeId: () => string; now: () => string },
 ): InsomniaImport {
   const root = json as { __export_format?: number; resources?: InsomniaResource[] };
   if (!root || !Array.isArray(root.resources)) {
     throw new Error("Não parece um export do Insomnia (esperava o campo 'resources').");
   }
 
-  const { workspaceId, makeId, now } = opts;
+  const { projectId, makeId, now } = opts;
   const resources = root.resources;
 
   // sortOrder é por pai, não global.
@@ -73,7 +73,7 @@ export function importInsomnia(
   const rootId = makeId();
   collections.push({
     id: rootId,
-    workspaceId,
+    projectId,
     parentId: null,
     name: workspaceResource?.name?.trim() || "Collection importada",
     sortOrder: 0,
@@ -95,7 +95,7 @@ export function importInsomnia(
     const parentId = ownerOf(r);
     collections.push({
       id: groupIds.get(r._id)!,
-      workspaceId,
+      projectId,
       parentId,
       name: r.name ?? "Pasta importada",
       sortOrder: takeSort(parentId),
@@ -111,7 +111,7 @@ export function importInsomnia(
     const auth = r.authentication ?? {};
     const request: ApiRequest = {
       id: makeId(),
-      workspaceId,
+      projectId,
       collectionId: owner,
       name: r.name ?? "Request importada",
       method: toMethod(r.method),
@@ -150,7 +150,7 @@ export function importInsomnia(
   for (const r of baseEnvs) {
     environments.push({
       id: makeId(),
-      workspaceId,
+      collectionId: rootId,
       name: "Base",
       isBase: true,
       variables: toVariables(r.data),
@@ -163,7 +163,7 @@ export function importInsomnia(
     if (baseIds.has(r._id)) continue;
     environments.push({
       id: makeId(),
-      workspaceId,
+      collectionId: rootId,
       name: r.name ?? "env importado",
       isBase: false,
       color: r.color ?? undefined,

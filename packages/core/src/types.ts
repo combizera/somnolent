@@ -7,16 +7,21 @@ export type HttpMethod =
   | "HEAD"
   | "OPTIONS";
 
-export interface Workspace {
+/**
+ * Project: o nível de topo e a unidade que se compartilha inteira. Guarda
+ * collections; o antigo `Workspace` era isto, só que implícito no cliente.
+ */
+export interface Project {
   id: string;
   name: string;
+  sortOrder: number;
   version: number;
   updatedAt: string;
 }
 
 export interface Collection {
   id: string;
-  workspaceId: string;
+  projectId: string;
   parentId: string | null;
   name: string;
   sortOrder: number;
@@ -42,7 +47,7 @@ export interface RequestAuth {
 
 export interface ApiRequest {
   id: string;
-  workspaceId: string;
+  projectId: string;
   collectionId: string | null;
   name: string;
   /** Anotação livre — vem do campo `description` do Insomnia. */
@@ -71,7 +76,11 @@ export interface EnvironmentVariable {
 
 export interface Environment {
   id: string;
-  workspaceId: string;
+  /**
+   * Collection dona — sempre uma raiz (`parentId: null`), nunca uma pasta.
+   * É o que faz uma collection compartilhada chegar resolvendo as variáveis.
+   */
+  collectionId: string;
   name: string;
   /** O base environment é aplicado antes do ambiente ativo. */
   isBase: boolean;

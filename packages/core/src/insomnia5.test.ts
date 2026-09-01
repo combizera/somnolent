@@ -11,7 +11,7 @@ const fixture = readFileSync(
 
 let counter = 0;
 const opts = {
-  workspaceId: "ws-1",
+  projectId: "prj-1",
   makeId: () => `id-${++counter}`,
   now: () => "2026-08-04T00:00:00.000Z",
 };
@@ -134,6 +134,14 @@ describe("importInsomniaExport — arquivo real do Insomnia v5", () => {
     expect(prod!.color).toBe("#e10505");
   });
 
+  it("prende os environments na collection raiz, não no project", () => {
+    const root = result.collections.find((c) => c.parentId === null)!;
+    expect(result.environments.length).toBeGreaterThan(0);
+    for (const env of result.environments) {
+      expect(env.collectionId).toBe(root.id);
+    }
+  });
+
   it("numera a ordem dos environments a partir do base", () => {
     const base = result.environments.find((e) => e.isBase)!;
     expect(base.sortOrder).toBe(0);
@@ -242,7 +250,7 @@ describe("importInsomniaV5 — profundidade de pastas", () => {
     };
 
     const result = importInsomniaV5(doc, {
-      workspaceId: "ws-1",
+      projectId: "prj-1",
       makeId: () => `deep-${++n}`,
       now: () => "2026-09-01T00:00:00.000Z",
     });

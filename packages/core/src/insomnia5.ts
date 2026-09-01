@@ -64,7 +64,7 @@ export interface ImportPayload {
 }
 
 export interface ImportOptions {
-  workspaceId: string;
+  projectId: string;
   makeId: () => string;
   now: () => string;
 }
@@ -131,7 +131,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
     );
   }
 
-  const { workspaceId, makeId, now } = opts;
+  const { projectId, makeId, now } = opts;
   const warnings: string[] = [];
   const collections: Collection[] = [];
   const requests: ApiRequest[] = [];
@@ -150,7 +150,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
   const rootId = makeId();
   collections.push({
     id: rootId,
-    workspaceId,
+    projectId,
     parentId: null,
     name: doc.name?.trim() || "Collection importada",
     sortOrder: takeSort(null),
@@ -165,7 +165,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
         const id = makeId();
         collections.push({
           id,
-          workspaceId,
+          projectId,
           parentId: collectionId,
           name,
           sortOrder: takeSort(collectionId),
@@ -186,7 +186,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
 
       const request: ApiRequest = {
         id: makeId(),
-        workspaceId,
+        projectId,
         collectionId,
         name,
         method: toMethod(node.method),
@@ -236,7 +236,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
   if (root) {
     environments.push({
       id: makeId(),
-      workspaceId,
+      collectionId: rootId,
       name: "Base",
       isBase: true,
       variables: toVariables(root.data),
@@ -247,7 +247,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
     for (const sub of bySortKey((root.subEnvironments ?? []) as (V5Environment & { meta?: V5Meta })[])) {
       environments.push({
         id: makeId(),
-        workspaceId,
+        collectionId: rootId,
         name: sub.name?.trim() || "env importado",
         isBase: false,
         color: sub.color ?? undefined,

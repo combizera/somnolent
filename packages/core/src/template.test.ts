@@ -17,7 +17,7 @@ function makeEnv(
 ): Environment {
   return {
     id: `env-${name}`,
-    workspaceId: "ws-1",
+    collectionId: "col-1",
     name,
     isBase,
     variables: Object.entries(vars).map(([key, value]) => ({
@@ -101,7 +101,7 @@ describe("extractVariables", () => {
 describe("resolveRequest", () => {
   const request: ApiRequest = {
     id: "req-1",
-    workspaceId: "ws-1",
+    projectId: "prj-1",
     collectionId: null,
     name: "List clients",
     method: "GET",
