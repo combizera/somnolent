@@ -16,13 +16,16 @@ Tudo que o Insomnia tem além disso (gRPC, GraphQL explorer, mocks, testes, plug
 
 ```
 Workspace
- ├── Collection (pasta, aninhável)
+ ├── Collection (a unidade que você abre na sidebar — "Catcher v1", "Piped"...)
+ │    ├── Pasta (subcollection, aninhável)
+ │    │    └── Request
  │    └── Request (método, URL, headers, query, body — tudo aceita {{var}})
  └── Environment (staging, prod, local...)
       └── Variables { base_url: "...", token: "...", ... }
 ```
 
 - **Workspace**: unidade de colaboração e de sync. Tem membros.
+- **Collection**: o nível de topo da sidebar, como no Insomnia — a sidebar lista as collections e você **entra** numa delas pra ver as requests. Isso evita misturar duas APIs no mesmo aside. Tecnicamente collection e pasta são a mesma entidade (`Collection` com `parentId`): collection é a que tem `parentId: null`. A collection aberta é escolha local de quem navega e não sincroniza.
 - **Request**: nunca guarda valores finais de URL/token — guarda templates. Ex.: `{{ base_url }}/v1/clients`.
 - **Environment**: um dicionário chave→valor. O environment **ativo** é escolha local de cada usuário (eu posso estar em `staging` enquanto meu colega valida em `prod` — o ativo não sincroniza, os environments em si sim).
 - **Base environment** (herança simples): variáveis comuns a todos os envs ficam no base; cada env sobrescreve o que precisa. É o mesmo modelo do Insomnia e resolve 90% dos casos.
@@ -125,6 +128,7 @@ Testes (`pnpm test`, 61 no total) **não precisam de Docker** — o server roda 
 
 ### Fase 1 — Cliente HTTP local ✅ → *usável sozinho, sem servidor*
 - [x] Layout 3 painéis: sidebar (collections) · request · response
+- [x] Sidebar em 2 níveis: lista de collections → entra numa e vê as pastas/requests dela
 - [x] Montar e enviar request: método, URL, headers, query params, body JSON
 - [x] Ver response: status, tempo, tamanho, body com highlight, headers
 - [x] CRUD de collections e requests (persistência local em localStorage)
@@ -143,7 +147,7 @@ Testes (`pnpm test`, 61 no total) **não precisam de Docker** — o server roda 
 **🚀 MVP = fim da Fase 2.** Você e seu colega no mesmo workspace, trocando de env com 1 clique. Estimativa: ~5 semanas.
 
 ### Fase 3 — Pós-MVP
-- [x] Import do Insomnia **v5 (YAML)** e **v4 (JSON)**, com detecção automática de formato: pastas aninhadas (achatadas como "Pai / Filho"), requests, query params (inclusive desabilitados), body, descrições, `pathParameters` (`:id` substituído pelo valor), auth bearer/basic, environments com cor, e `{{ _.var }}` → `{{ var }}`
+- [x] Import do Insomnia **v5 (YAML)** e **v4 (JSON)**, com detecção automática de formato: todo o export entra em **uma** collection nomeada pelo documento, com as pastas aninhadas preservadas como subpastas, requests, query params (inclusive desabilitados), body, descrições, `pathParameters` (`:id` substituído pelo valor), auth bearer/basic, environments com cor, e `{{ _.var }}` → `{{ var }}`
 - [x] Variáveis de credencial (`token`, `secret`, `password`, `api_key`…) entram marcadas como **secretas** no import — valor fica local, não sobe no sync
 - [x] Relatório pós-import: contagem de requests/pastas/environments + avisos (path param vazio, token literal fora de variável)
 - [x] Import de cURL (cola o comando no modal de importar) e "copiar como cURL" (resolvido no env ativo)
