@@ -43,7 +43,8 @@ function toKeyValues(
 
 /**
  * Importa um export v4 do Insomnia ("Export Data" → JSON).
- * Grupos aninhados são achatados no grupo de topo (só temos 1 nível de pasta).
+ * Todo o export entra dentro de UMA collection (nomeada pelo workspace do
+ * arquivo) e os grupos aninhados viram subpastas de verdade (`parentId`).
  */
 export function importInsomnia(
   json: unknown,
@@ -56,51 +57,62 @@ export function importInsomnia(
 
   const { workspaceId, makeId, now } = opts;
   const resources = root.resources;
-  const byId = new Map(resources.map((r) => [r._id, r]));
 
-  // Grupo de topo de cada resource: sobe a cadeia de request_groups até o último antes do workspace.
-  const topGroupOf = (resource: InsomniaResource): InsomniaResource | null => {
-    let current: InsomniaResource | null = null;
-    let cursor: InsomniaResource | undefined =
-      resource._type === "request_group" ? resource : byId.get(resource.parentId ?? "");
-    while (cursor && cursor._type === "request_group") {
-      current = cursor;
-      cursor = byId.get(cursor.parentId ?? "");
-    }
-    return current;
+  // sortOrder é por pai, não global.
+  const nextSort = new Map<string, number>();
+  const takeSort = (parentId: string) => {
+    const at = nextSort.get(parentId) ?? 0;
+    nextSort.set(parentId, at + 1);
+    return at;
   };
 
-  const groupIds = new Map<string, string>();
   const collections: Collection[] = [];
-  let sort = 0;
-  for (const r of resources) {
-    if (r._type !== "request_group") continue;
-    const top = topGroupOf(r);
-    if (top && top._id === r._id && !groupIds.has(r._id)) {
-      const id = makeId();
-      groupIds.set(r._id, id);
-      collections.push({
-        id,
-        workspaceId,
-        parentId: null,
-        name: r.name ?? "Pasta importada",
-        sortOrder: sort++,
-        version: 1,
-        updatedAt: now(),
-      });
-    }
+
+  // Uma collection raiz por import: é ela que aparece na lista da sidebar.
+  const workspaceResource = resources.find((r) => r._type === "workspace");
+  const rootId = makeId();
+  collections.push({
+    id: rootId,
+    workspaceId,
+    parentId: null,
+    name: workspaceResource?.name?.trim() || "Collection importada",
+    sortOrder: 0,
+    version: 1,
+    updatedAt: now(),
+  });
+
+  // Um id nosso por grupo do arquivo, antes de resolver os pais: um grupo pode
+  // aparecer no JSON antes do seu pai.
+  const groupIds = new Map<string, string>();
+  const groups = resources.filter((r) => r._type === "request_group");
+  for (const r of groups) groupIds.set(r._id, makeId());
+
+  /** Pasta dona de um resource: o grupo pai, ou a collection raiz. */
+  const ownerOf = (resource: InsomniaResource): string =>
+    groupIds.get(resource.parentId ?? "") ?? rootId;
+
+  for (const r of groups) {
+    const parentId = ownerOf(r);
+    collections.push({
+      id: groupIds.get(r._id)!,
+      workspaceId,
+      parentId,
+      name: r.name ?? "Pasta importada",
+      sortOrder: takeSort(parentId),
+      version: 1,
+      updatedAt: now(),
+    });
   }
 
   const requests: ApiRequest[] = [];
-  sort = 0;
   for (const r of resources) {
     if (r._type !== "request") continue;
-    const top = topGroupOf(r);
+    const owner = ownerOf(r);
     const auth = r.authentication ?? {};
     const request: ApiRequest = {
       id: makeId(),
       workspaceId,
-      collectionId: top ? (groupIds.get(top._id) ?? null) : null,
+      collectionId: owner,
       name: r.name ?? "Request importada",
       method: toMethod(r.method),
       url: convertTemplates(r.url ?? ""),
@@ -112,7 +124,7 @@ export function importInsomnia(
           ? "json"
           : "text"
         : "none",
-      sortOrder: sort++,
+      sortOrder: takeSort(owner),
       version: 1,
       updatedAt: now(),
     };

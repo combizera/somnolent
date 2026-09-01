@@ -32,22 +32,36 @@ describe("importInsomniaExport — arquivo real do Insomnia v5", () => {
     expect(result.requests).toHaveLength(11);
   });
 
-  it("achata pastas aninhadas usando o caminho completo", () => {
+  it("cria uma collection raiz com o nome do documento", () => {
+    const roots = result.collections.filter((c) => c.parentId === null);
+    expect(roots).toHaveLength(1);
+    expect(roots[0]!.name).toBe("Catcher - Intimations");
+  });
+
+  it("mantém as pastas aninhadas como subpastas, não achatadas no nome", () => {
+    const root = result.collections.find((c) => c.parentId === null)!;
+    const trackers = result.collections.find((c) => c.name === "Trackers")!;
+    const intimations = result.collections.find((c) => c.name === "Intimations")!;
+
+    expect(trackers.parentId).toBe(root.id);
+    expect(intimations.parentId).toBe(trackers.id);
     expect(result.collections.map((c) => c.name)).toEqual([
+      "Catcher - Intimations",
       "Trackers",
-      "Trackers / Intimations",
+      "Intimations",
     ]);
   });
 
-  it("request fora de pasta fica na raiz", () => {
+  it("request fora de pasta fica na collection raiz", () => {
+    const root = result.collections.find((c) => c.parentId === null)!;
     const account = result.requests.find((r) => r.name === "Account Detail")!;
-    expect(account.collectionId).toBeNull();
+    expect(account.collectionId).toBe(root.id);
     expect(account.method).toBe("GET");
   });
 
   it("liga cada request à pasta certa", () => {
     const trackers = result.collections.find((c) => c.name === "Trackers")!;
-    const intimations = result.collections.find((c) => c.name === "Trackers / Intimations")!;
+    const intimations = result.collections.find((c) => c.name === "Intimations")!;
 
     expect(result.requests.find((r) => r.name === "Create Tracker")!.collectionId).toBe(
       trackers.id,

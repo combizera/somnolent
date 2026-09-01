@@ -120,8 +120,9 @@ function applyPathParams(
 
 /**
  * Importa um export v5 do Insomnia (arquivo YAML, `type: collection.insomnia.rest/5.0`).
- * Pastas aninhadas viram uma pasta por caminho ("Trackers / Intimations"), já que
- * nosso modelo tem um nível só.
+ * Todo o export entra dentro de UMA collection nomeada pelo documento, e as
+ * pastas aninhadas viram subpastas de verdade (`parentId`) — assim dois imports
+ * não se misturam no mesmo nível da sidebar.
  */
 export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPayload {
   if (!isInsomniaV5(doc)) {
@@ -136,22 +137,42 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
   const requests: ApiRequest[] = [];
   let literalTokens = 0;
 
-  const walk = (nodes: V5Node[], trail: string[], collectionId: string | null) => {
+  // sortOrder é por pai, não global: cada nível tem a sua ordem.
+  const nextSort = new Map<string, number>();
+  const takeSort = (parentId: string | null) => {
+    const key = parentId ?? "root";
+    const at = nextSort.get(key) ?? 0;
+    nextSort.set(key, at + 1);
+    return at;
+  };
+
+  // Uma collection raiz por import: é ela que aparece na lista da sidebar.
+  const rootId = makeId();
+  collections.push({
+    id: rootId,
+    workspaceId,
+    parentId: null,
+    name: doc.name?.trim() || "Collection importada",
+    sortOrder: takeSort(null),
+    version: 1,
+    updatedAt: now(),
+  });
+
+  const walk = (nodes: V5Node[], collectionId: string) => {
     for (const node of bySortKey(nodes)) {
       if (isFolder(node)) {
         const name = node.name?.trim() || "Pasta importada";
-        const path = [...trail, name];
         const id = makeId();
         collections.push({
           id,
           workspaceId,
-          parentId: null,
-          name: path.join(" / "),
-          sortOrder: collections.length,
+          parentId: collectionId,
+          name,
+          sortOrder: takeSort(collectionId),
           version: 1,
           updatedAt: now(),
         });
-        walk(node.children ?? [], path, id);
+        walk(node.children ?? [], id);
         continue;
       }
 
@@ -178,7 +199,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
             ? "json"
             : "text"
           : "none",
-        sortOrder: requests.length,
+        sortOrder: takeSort(collectionId),
         version: 1,
         updatedAt: now(),
       };
@@ -207,7 +228,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
     }
   };
 
-  walk(doc.collection ?? [], [], null);
+  walk(doc.collection ?? [], rootId);
 
   // Environments: o v5 traz um objeto base com subEnvironments dentro.
   const environments: Environment[] = [];

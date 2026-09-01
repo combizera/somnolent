@@ -64,11 +64,27 @@ const insomniaExport = {
 describe("importInsomnia", () => {
   const result = importInsomnia(insomniaExport, opts);
 
-  it("achata grupos aninhados no grupo de topo", () => {
-    expect(result.collections).toHaveLength(1);
-    expect(result.collections[0]?.name).toBe("Clientes");
+  it("põe tudo numa collection raiz com o nome do workspace do arquivo", () => {
+    const roots = result.collections.filter((c) => c.parentId === null);
+    expect(roots).toHaveLength(1);
+    expect(roots[0]?.name).toBe("Meu projeto");
+
+    // request solta no workspace cai na raiz
+    const create = result.requests.find((r) => r.name === "Criar cliente")!;
+    expect(create.collectionId).toBe(roots[0]?.id);
+  });
+
+  it("preserva grupos aninhados como subpastas", () => {
+    const root = result.collections.find((c) => c.parentId === null)!;
+    const clientes = result.collections.find((c) => c.name === "Clientes")!;
+    const aninhada = result.collections.find((c) => c.name === "Aninhada")!;
+
+    expect(clientes.parentId).toBe(root.id);
+    expect(aninhada.parentId).toBe(clientes.id);
+
+    // a request vivia no grupo mais profundo e continua nele
     const req = result.requests.find((r) => r.name === "Listar clientes")!;
-    expect(req.collectionId).toBe(result.collections[0]?.id);
+    expect(req.collectionId).toBe(aninhada.id);
   });
 
   it("converte {{ _.var }} pra {{ var }} em url, headers e body", () => {
