@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Check, ChevronDown, Loader2, Send } from 'lucide-react'
+import { Check, ChevronDown, Eye, EyeOff, Loader2, Send } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import {
   buildContext,
   resolveRequest,
+  resolveTemplate,
   toCurl,
   type ApiRequest,
   type HttpMethod,
@@ -21,6 +22,49 @@ import { METHOD_TEXT } from '../lib/methodColors'
 const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
 type Tab = 'params' | 'headers' | 'auth' | 'body'
 
+const AUTH_LABEL: Record<RequestAuth['type'], string> = {
+  none: 'Nenhuma',
+  bearer: 'Bearer token',
+  basic: 'Basic',
+}
+
+/** Base64 tolerante: token com acento faria o btoa estourar. */
+function toBase64(text: string): string {
+  try {
+    return btoa(text)
+  } catch {
+    return '—'
+  }
+}
+
+/** Uma linha rótulo + campo, no mesmo idioma das tabelas de variáveis. */
+function AuthField({
+  label,
+  value,
+  onChange,
+  ctx,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  ctx: Record<string, string>
+  placeholder: string
+}) {
+  return (
+    <div className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-3">
+      <label className="text-[10px] font-semibold tracking-wider text-ink-faint uppercase">
+        {label}
+      </label>
+      {/* Sempre TemplateInput: o campo guarda o template, não o segredo — quem
+          precisa de máscara é o valor resolvido, logo abaixo em "Envia". */}
+      <div className="rounded-md border border-line bg-app focus-within:border-brand">
+        <TemplateInput value={value} onChange={onChange} ctx={ctx} placeholder={placeholder} />
+      </div>
+    </div>
+  )
+}
+
 function AuthEditor({
   auth,
   onChange,
@@ -30,68 +74,125 @@ function AuthEditor({
   onChange: (auth: RequestAuth) => void
   ctx: Record<string, string>
 }) {
+  const [revealed, setRevealed] = useState(false)
+
+  // O que vai sair no header, já resolvido no environment ativo.
+  const preview = (() => {
+    if (auth.type === 'bearer') {
+      const token = resolveTemplate(auth.token ?? '', ctx)
+      return {
+        text: `Bearer ${token.output || '…'}`,
+        missing: token.missing,
+      }
+    }
+    if (auth.type === 'basic') {
+      const user = resolveTemplate(auth.username ?? '', ctx)
+      const pass = resolveTemplate(auth.password ?? '', ctx)
+      return {
+        text: `Basic ${toBase64(`${user.output}:${pass.output}`)}`,
+        missing: [...user.missing, ...pass.missing],
+      }
+    }
+    return null
+  })()
+
   return (
-    <div className="flex max-w-md flex-col gap-3">
-      <div className="flex w-fit gap-0.5 rounded-md bg-app p-0.5">
-        {(['none', 'bearer', 'basic'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => onChange({ ...auth, type: t })}
-            className={`rounded px-3 py-1 text-xs transition ${
-              auth.type === t ? 'bg-raised text-ink' : 'text-ink-dim hover:text-ink'
-            }`}
+    <div className="flex max-w-2xl flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <label className="text-[10px] font-semibold tracking-wider text-ink-faint uppercase">
+          Tipo
+        </label>
+        {/* mesmo idioma do seletor de método: chevron sobreposto, não background-image */}
+        <div className="relative">
+          <select
+            value={auth.type}
+            onChange={(e) => onChange({ ...auth, type: e.target.value as RequestAuth['type'] })}
+            className="cursor-pointer appearance-none rounded-md border border-line bg-app py-1.5 pr-8 pl-3 text-xs font-medium text-ink focus:border-brand focus:outline-none"
           >
-            {t === 'none' ? 'nenhuma' : t}
-          </button>
-        ))}
+            {(['none', 'bearer', 'basic'] as const).map((t) => (
+              <option key={t} value={t}>
+                {AUTH_LABEL[t]}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 right-2.5 size-3 -translate-y-1/2 text-ink-faint"
+          />
+        </div>
       </div>
 
+      {auth.type === 'none' && (
+        <p className="rounded-md border border-dashed border-line px-3 py-4 text-center text-xs leading-relaxed text-ink-faint">
+          Esta request vai sem header <span className="font-mono">Authorization</span>.
+          <br />
+          Escolha um tipo acima, ou escreva o header na aba Headers.
+        </p>
+      )}
+
       {auth.type === 'bearer' && (
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-ink-dim">Token (aceita {'{{ vars }}'})</label>
-          <div className="rounded-md border border-line bg-app focus-within:border-brand">
-            <TemplateInput
-              value={auth.token ?? ''}
-              onChange={(token) => onChange({ ...auth, token })}
-              ctx={ctx}
-              placeholder="{{ token }}"
-            />
-          </div>
-          <p className="text-xs text-ink-faint">
-            Vira o header <span className="font-mono">Authorization: Bearer …</span> no envio.
-          </p>
-        </div>
+        <AuthField
+          label="Token"
+          value={auth.token ?? ''}
+          onChange={(token) => onChange({ ...auth, token })}
+          ctx={ctx}
+          placeholder="{{ token }}"
+        />
       )}
 
       {auth.type === 'basic' && (
         <div className="flex flex-col gap-2">
-          <div className="rounded-md border border-line bg-app focus-within:border-brand">
-            <TemplateInput
-              value={auth.username ?? ''}
-              onChange={(username) => onChange({ ...auth, username })}
-              ctx={ctx}
-              placeholder="usuário"
-            />
-          </div>
-          <div className="rounded-md border border-line bg-app focus-within:border-brand">
-            <TemplateInput
-              value={auth.password ?? ''}
-              onChange={(password) => onChange({ ...auth, password })}
-              ctx={ctx}
-              placeholder="senha"
-            />
-          </div>
-          <p className="text-xs text-ink-faint">
-            Vira <span className="font-mono">Authorization: Basic base64(usuário:senha)</span>.
-          </p>
+          <AuthField
+            label="Usuário"
+            value={auth.username ?? ''}
+            onChange={(username) => onChange({ ...auth, username })}
+            ctx={ctx}
+            placeholder="{{ user }}"
+          />
+          <AuthField
+            label="Senha"
+            value={auth.password ?? ''}
+            onChange={(password) => onChange({ ...auth, password })}
+            ctx={ctx}
+            placeholder="{{ password }}"
+          />
         </div>
       )}
 
-      {auth.type !== 'none' && (
-        <p className="text-xs text-ink-faint">
-          Um header <span className="font-mono">Authorization</span> manual na aba Headers tem
-          precedência sobre esta configuração.
-        </p>
+      {preview && (
+        <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3">
+            <span className="pt-1.5 text-[10px] font-semibold tracking-wider text-ink-faint uppercase">
+              Envia
+            </span>
+            <div className="flex min-w-0 items-center gap-1 rounded-md border border-line-soft bg-app px-3 py-1.5">
+              {preview.missing.length > 0 ? (
+                <p className="min-w-0 flex-1 font-mono text-xs text-bad">
+                  variáveis faltando: {preview.missing.join(', ')}
+                </p>
+              ) : (
+                <>
+                  <p className="min-w-0 flex-1 truncate font-mono text-xs text-ink-dim">
+                    <span className="text-ink-faint">Authorization: </span>
+                    {revealed ? preview.text : preview.text.replace(/\S/g, '•').slice(0, 44)}
+                  </p>
+                  <button
+                    onClick={() => setRevealed((r) => !r)}
+                    className="shrink-0 text-ink-faint transition hover:text-ink"
+                    title={revealed ? 'Ocultar valor enviado' : 'Mostrar valor enviado'}
+                    aria-label={revealed ? 'Ocultar valor enviado' : 'Mostrar valor enviado'}
+                  >
+                    {revealed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          <p className="pl-[100px] text-xs text-ink-faint">
+            Um header <span className="font-mono">Authorization</span> manual na aba Headers tem
+            precedência.
+          </p>
+        </div>
       )}
     </div>
   )
