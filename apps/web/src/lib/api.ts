@@ -11,13 +11,22 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(path: string, options: { method?: string; token?: string | null; body?: unknown } = {}): Promise<T> {
+async function call<T>(
+  path: string,
+  options: {
+    method?: string
+    token?: string | null
+    body?: unknown
+    headers?: Record<string, string>
+  } = {},
+): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: options.method ?? 'GET',
     headers: {
       // Content-Type só quando há body — Fastify rejeita JSON vazio com 400.
       ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      ...options.headers,
     },
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   })
@@ -26,34 +35,55 @@ async function call<T>(path: string, options: { method?: string; token?: string 
   return data as T
 }
 
+/** O que uma chave abre — resposta de GET /me. */
+export interface KeyInfo {
+  scope: 'project' | 'collection'
+  role: 'write' | 'read'
+  label: string
+  project: { id: string; name: string }
+  collection: { id: string; name: string | null } | null
+}
+
+export interface KeyRow {
+  id: string
+  label: string
+  role: 'write' | 'read'
+  scope: 'project' | 'collection'
+  collectionId: string | null
+  createdAt: string
+  lastUsedAt: string | null
+  /** É a chave com que esta máquina está conectada. */
+  mine: boolean
+}
+
 export const api = {
-  register: (email: string, password: string) =>
-    call<{ token: string; email: string }>('/auth/register', {
+  /** Cria o project e devolve a primeira chave de escrita — ela só aparece aqui. */
+  createProject: (name: string, createToken?: string) =>
+    call<{ id: string; name: string; key: string }>('/projects', {
       method: 'POST',
-      body: { email, password },
+      body: { name },
+      headers: createToken ? { 'X-Create-Token': createToken } : undefined,
     }),
 
-  login: (email: string, password: string) =>
-    call<{ token: string; email: string }>('/auth/login', {
+  me: (key: string) => call<KeyInfo>('/me', { token: key }),
+
+  listKeys: (key: string) => call<{ keys: KeyRow[] }>('/keys', { token: key }),
+
+  createKey: (
+    key: string,
+    body: { label: string; role: 'write' | 'read'; collectionId?: string | null },
+  ) =>
+    call<{ id: string; label: string; role: string; key: string }>('/keys', {
       method: 'POST',
-      body: { email, password },
+      token: key,
+      body,
     }),
 
-  listWorkspaces: (token: string) =>
-    call<{ workspaces: { id: string; name: string; role: string }[] }>('/workspaces', { token }),
-
-  createWorkspace: (token: string, name: string) =>
-    call<{ id: string; name: string }>('/workspaces', { method: 'POST', token, body: { name } }),
-
-  createInvite: (token: string, workspaceId: string) =>
-    call<{ code: string }>(`/workspaces/${workspaceId}/invites`, { method: 'POST', token }),
-
-  acceptInvite: (token: string, code: string) =>
-    call<{ id: string; name: string }>(`/invites/${code}/accept`, { method: 'POST', token }),
+  revokeKey: (key: string, id: string) =>
+    call<{ revoked: boolean }>(`/keys/${id}`, { method: 'DELETE', token: key }),
 
   sync: (
-    token: string,
-    workspaceId: string,
+    key: string,
     payload: {
       since: string | null
       changes: Record<string, unknown[]>
@@ -64,7 +94,7 @@ export const api = {
       now: string
       changes: Record<string, unknown[]>
       deletes: Record<string, string[]>
-    }>(`/workspaces/${workspaceId}/sync`, { method: 'POST', token, body: payload }),
+    }>('/sync', { method: 'POST', token: key, body: payload }),
 
   proxy: async (token: string, resolved: ResolvedRequest): Promise<SendResult | SendError> => {
     const started = performance.now()
@@ -100,6 +130,10 @@ export const api = {
   },
 }
 
-export function wsUrl(workspaceId: string, token: string) {
-  return `${API_URL.replace(/^http/, 'ws')}/workspaces/${workspaceId}/ws?token=${encodeURIComponent(token)}`
+/**
+ * A chave não vai na query: query entra em log de acesso. Ela viaja no
+ * subprotocolo do WebSocket — ver o segundo argumento de `new WebSocket`.
+ */
+export function wsUrl() {
+  return `${API_URL.replace(/^http/, 'ws')}/sync/ws`
 }

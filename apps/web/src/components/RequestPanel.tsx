@@ -226,10 +226,11 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
     }
     setSending(request.id, true)
     let result = await sendRequest(final)
-    // Falhou sem resposta (CORS, offline)? Se estamos logados, tenta pelo proxy do servidor.
-    const token = useStore.getState().auth.token
-    if (!result.ok && result.network && token) {
-      result = await api.proxy(token, final)
+    // Falhou sem resposta (CORS, offline)? Com uma chave de sync em mãos,
+    // tenta de novo pelo proxy do servidor, que não sofre CORS.
+    const key = useStore.getState().connection.key
+    if (!result.ok && result.network && key) {
+      result = await api.proxy(key, final)
     }
     setSending(request.id, false)
     setResponse(request.id, result)

@@ -158,15 +158,23 @@ interface AppState {
   openCollectionId: string | null
   history: Record<string, HistoryEntry[]>
 
-  auth: { token: string | null; email: string | null }
-  server: { workspaceId: string | null; name: string | null }
+  /**
+   * Conexão de sync. Não há conta: a chave é a credencial e o que ela abre
+   * (project inteiro ou uma collection) vem do servidor em /me.
+   */
+  connection: {
+    key: string | null
+    scope: 'project' | 'collection' | null
+    role: 'write' | 'read' | null
+    label: string | null
+    projectName: string | null
+    collectionId: string | null
+  }
   lastSyncAt: string | null
   pendingDeletes: PendingDeletes
 
-  setAuth: (token: string, email: string) => void
-  clearAuth: () => void
-  setServerWorkspace: (workspaceId: string, name: string) => void
-  disconnectWorkspace: () => void
+  connect: (key: string, info: Omit<AppState['connection'], 'key'>) => void
+  disconnect: () => void
   setLastSyncAt: (at: string) => void
   clearPendingDeletes: (pushed: PendingDeletes) => void
   replaceAllData: () => void
@@ -217,22 +225,32 @@ export const useStore = create<AppState>()(
       openCollectionId: null,
       ...seed(),
 
-      auth: { token: null, email: null },
-      server: { workspaceId: null, name: null },
+      connection: {
+        key: null,
+        scope: null,
+        role: null,
+        label: null,
+        projectName: null,
+        collectionId: null,
+      },
       lastSyncAt: null,
       pendingDeletes: { collections: [], requests: [], environments: [] },
 
-      setAuth: (token, email) => set({ auth: { token, email } }),
-      clearAuth: () =>
+      connect: (key, info) => set({ connection: { key, ...info }, lastSyncAt: null }),
+
+      disconnect: () =>
         set({
-          auth: { token: null, email: null },
-          server: { workspaceId: null, name: null },
+          connection: {
+            key: null,
+            scope: null,
+            role: null,
+            label: null,
+            projectName: null,
+            collectionId: null,
+          },
           lastSyncAt: null,
         }),
-      setServerWorkspace: (workspaceId, name) =>
-        set({ server: { workspaceId, name }, lastSyncAt: null }),
-      disconnectWorkspace: () =>
-        set({ server: { workspaceId: null, name: null }, lastSyncAt: null }),
+
       setLastSyncAt: (at) => set({ lastSyncAt: at }),
 
       clearPendingDeletes: (pushed) =>

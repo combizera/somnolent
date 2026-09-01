@@ -29,9 +29,8 @@ let queued = false
 
 export async function syncNow(): Promise<void> {
   const s = useStore.getState()
-  const { token } = s.auth
-  const { workspaceId } = s.server
-  if (!token || !workspaceId) return
+  const { key, role } = s.connection
+  if (!key) return
 
   if (syncing) {
     queued = true
@@ -51,19 +50,24 @@ export async function syncNow(): Promise<void> {
       environments: [...s.pendingDeletes.environments],
     }
 
-    const result = await api.sync(token, workspaceId, {
+    // Chave de leitura não empurra nada: o servidor recusaria com 403 e o
+    // status ficaria em erro permanente.
+    const readOnly = role === 'read'
+    const result = await api.sync(key, {
       since,
-      changes: {
-        collections: changedOnly(s.collections),
-        requests: changedOnly(s.requests),
-        environments: changedOnly(s.environments).map(stripSecrets),
-      },
-      deletes: { ...pushedDeletes },
+      changes: readOnly
+        ? {}
+        : {
+            collections: changedOnly(s.collections),
+            requests: changedOnly(s.requests),
+            environments: changedOnly(s.environments).map(stripSecrets),
+          },
+      deletes: readOnly ? {} : { ...pushedDeletes },
     })
 
     const store = useStore.getState()
     store.applyRemote(result.changes as RemoteChanges, result.deletes as Partial<PendingDeletes>)
-    store.clearPendingDeletes(pushedDeletes)
+    if (!readOnly) store.clearPendingDeletes(pushedDeletes)
     store.setLastSyncAt(result.now)
     setStatus('ok')
   } catch (err) {
@@ -83,20 +87,20 @@ let ws: WebSocket | null = null
 let debounceTimer: ReturnType<typeof setTimeout> | undefined
 let wsKey = ''
 
-function connectWs(workspaceId: string, token: string) {
-  const key = `${workspaceId}:${token}`
+function connectWs(key: string) {
   if (wsKey === key && ws && ws.readyState <= WebSocket.OPEN) return
   ws?.close()
   wsKey = key
-  ws = new WebSocket(wsUrl(workspaceId, token))
+  // a chave vai no subprotocolo, não na query: query entra em log de acesso
+  ws = new WebSocket(wsUrl(), [key])
   ws.onmessage = () => void syncNow()
   ws.onclose = () => {
-    // Reconecta se ainda estamos no mesmo workspace.
+    // Reconecta se a chave ainda é a mesma (revogar troca isso pra null).
     setTimeout(() => {
       const s = useStore.getState()
-      if (s.auth.token && s.server.workspaceId && wsKey === `${s.server.workspaceId}:${s.auth.token}`) {
+      if (s.connection.key && wsKey === s.connection.key) {
         wsKey = ''
-        connectWs(s.server.workspaceId, s.auth.token)
+        connectWs(s.connection.key)
       }
     }, 3000)
   }
@@ -108,22 +112,22 @@ export function startSyncEngine() {
   started = true
 
   useStore.subscribe((state, prev) => {
-    const connected = state.auth.token && state.server.workspaceId
-    if (!connected) {
+    const key = state.connection.key
+    if (!key) {
       ws?.close()
       ws = null
       wsKey = ''
       setStatus('off')
       return
     }
-    connectWs(state.server.workspaceId!, state.auth.token!)
+    connectWs(key)
 
     const dataChanged =
       state.collections !== prev.collections ||
       state.requests !== prev.requests ||
       state.environments !== prev.environments ||
       state.pendingDeletes !== prev.pendingDeletes
-    const justConnected = state.server.workspaceId !== prev.server.workspaceId
+    const justConnected = state.connection.key !== prev.connection.key
 
     if (dataChanged || justConnected) {
       clearTimeout(debounceTimer)
@@ -133,14 +137,13 @@ export function startSyncEngine() {
 
   // Polling de segurança caso o WebSocket caia sem avisar.
   setInterval(() => {
-    const s = useStore.getState()
-    if (s.auth.token && s.server.workspaceId) void syncNow()
+    if (useStore.getState().connection.key) void syncNow()
   }, 20_000)
 
-  // Sync inicial se a sessão persistida já estava conectada.
+  // Sync inicial se a chave persistida ainda estiver lá.
   const s = useStore.getState()
-  if (s.auth.token && s.server.workspaceId) {
-    connectWs(s.server.workspaceId, s.auth.token)
+  if (s.connection.key) {
+    connectWs(s.connection.key)
     void syncNow()
   }
 }
