@@ -199,3 +199,62 @@ describe("detecção de formato", () => {
     );
   });
 });
+
+describe("importInsomniaV5 — profundidade de pastas", () => {
+  it("preserva a cadeia inteira, sem teto de níveis", () => {
+    let n = 0;
+    const doc = {
+      type: "collection.insomnia.rest/5.0",
+      name: "Deep",
+      collection: [
+        {
+          name: "N1",
+          children: [
+            {
+              name: "N2",
+              children: [
+                {
+                  name: "N3",
+                  children: [
+                    {
+                      name: "N4",
+                      children: [
+                        { name: "fundo", method: "GET", url: "{{ _.base_url }}/fundo" },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = importInsomniaV5(doc, {
+      workspaceId: "ws-1",
+      makeId: () => `deep-${++n}`,
+      now: () => "2026-09-01T00:00:00.000Z",
+    });
+
+    // raiz (nome do documento) + N1..N4
+    expect(result.collections.map((c) => c.name)).toEqual([
+      "Deep",
+      "N1",
+      "N2",
+      "N3",
+      "N4",
+    ]);
+
+    // cada pasta aponta pra anterior: uma corrente, não cinco irmãs
+    const byName = new Map(result.collections.map((c) => [c.name, c]));
+    expect(byName.get("Deep")!.parentId).toBeNull();
+    for (const [child, parent] of [["N1", "Deep"], ["N2", "N1"], ["N3", "N2"], ["N4", "N3"]]) {
+      expect(byName.get(child!)!.parentId).toBe(byName.get(parent!)!.id);
+    }
+
+    // a request do fundo fica na pasta mais profunda
+    expect(result.requests).toHaveLength(1);
+    expect(result.requests[0]!.collectionId).toBe(byName.get("N4")!.id);
+  });
+});

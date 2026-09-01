@@ -138,7 +138,6 @@ function FolderHeader({
   collapsed,
   onToggle,
   onAddSub,
-  depth,
   editing,
   onStartEditing,
   onStopEditing,
@@ -153,7 +152,6 @@ function FolderHeader({
   collapsed: boolean
   onToggle: () => void
   onAddSub: () => void
-  depth: number
   editing: boolean
   onStartEditing: () => void
   onStopEditing: () => void
@@ -241,19 +239,17 @@ function FolderHeader({
         >
           <Plus className="size-3.5" />
         </button>
-        {depth < 2 && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onAddSub()
-            }}
-            className="px-1 text-ink-faint hover:text-ink"
-            title="Nova subpasta"
-            aria-label="Nova subpasta"
-          >
-            <FolderPlus className="size-3.5" />
-          </button>
-        )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onAddSub()
+          }}
+          className="px-1 text-ink-faint hover:text-ink"
+          title="Nova subpasta"
+          aria-label="Nova subpasta"
+        >
+          <FolderPlus className="size-3.5" />
+        </button>
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -503,7 +499,7 @@ export function Sidebar() {
 
   const dragProps = { enabled: dndEnabled, drag, setDrag, spot, setSpot, onDrop: handleDrop }
 
-  const renderFolder = (col: Collection, depth = 0) => {
+  const renderFolder = (col: Collection) => {
     const items = inFolder(col.id)
     const childCols = sortedCollections.filter((c) => c.parentId === col.id)
     const isCollapsed = collapsed.has(col.id) && !q
@@ -518,7 +514,6 @@ export function Sidebar() {
             addSubCollection(col.id, 'Nova subpasta')
             if (collapsed.has(col.id)) toggle(col.id)
           }}
-          depth={depth}
           editing={editingId === col.id}
           onStartEditing={() => setEditingId(col.id)}
           onStopEditing={() => setEditingId(null)}
@@ -526,7 +521,7 @@ export function Sidebar() {
         />
         {!isCollapsed && (
           <div className="mt-0.5 ml-2 flex flex-col gap-0.5 border-l border-line-soft pl-2">
-            {childCols.map((child) => renderFolder(child, depth + 1))}
+            {childCols.map((child) => renderFolder(child))}
             {items.map((r) => (
               <RequestRow key={r.id} request={r} {...dragProps} />
             ))}
