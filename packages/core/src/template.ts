@@ -144,3 +144,44 @@ export function resolveRequest(
     missing: [...missing],
   };
 }
+
+/** Um `{{` aberto e ainda não fechado à esquerda do caret. */
+export interface OpenToken {
+  /** Posição do `{{`. */
+  start: number;
+  /** Nome parcial já digitado depois dele, sem espaços nas pontas. */
+  query: string;
+}
+
+const OPEN_TOKEN = /\{\{([\w.\- ]*)$/;
+
+/**
+ * Detecta se o caret está dentro de um `{{ ... }}` em aberto — é o que
+ * dispara o autocomplete de variáveis. Devolve null quando não está.
+ */
+export function findOpenToken(text: string, caret: number): OpenToken | null {
+  const before = text.slice(0, Math.max(0, Math.min(caret, text.length)));
+  const match = before.match(OPEN_TOKEN);
+  if (!match || match.index === undefined) return null;
+  return { start: match.index, query: (match[1] ?? "").trim() };
+}
+
+/**
+ * Troca o token em aberto pela variável escolhida, devolvendo o texto novo e
+ * onde o caret deve ficar. Come um `}}` que já esteja à frente do caret, pra
+ * não duplicar as chaves.
+ */
+export function completeToken(
+  text: string,
+  caret: number,
+  token: OpenToken,
+  name: string,
+): { text: string; caret: number } {
+  const closing = text.slice(caret).match(/^\s*\}\}/);
+  const end = caret + (closing?.[0].length ?? 0);
+  const insertion = `{{ ${name} }}`;
+  return {
+    text: text.slice(0, token.start) + insertion + text.slice(end),
+    caret: token.start + insertion.length,
+  };
+}

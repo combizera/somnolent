@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildContext,
+  completeToken,
   extractVariables,
+  findOpenToken,
   resolveRequest,
   resolveTemplate,
 } from "./template.js";
@@ -162,5 +164,76 @@ describe("resolveRequest", () => {
   it("acumula variáveis faltantes de todas as partes", () => {
     const r = resolveRequest(request, null, null);
     expect(r.missing.sort()).toEqual(["base_url", "page", "token"]);
+  });
+});
+
+describe("findOpenToken", () => {
+  it("acha o {{ aberto imediatamente antes do caret", () => {
+    const text = "{{ ba";
+    expect(findOpenToken(text, text.length)).toEqual({ start: 0, query: "ba" });
+  });
+
+  it("aceita o {{ vazio, logo depois de abrir as chaves", () => {
+    expect(findOpenToken("https://x/{{", 12)).toEqual({ start: 10, query: "" });
+  });
+
+  it("ignora token já fechado", () => {
+    const text = "{{ base_url }}/api";
+    expect(findOpenToken(text, text.length)).toBeNull();
+  });
+
+  it("usa o {{ mais próximo quando há vários", () => {
+    const text = "{{ base_url }}/x/{{ to";
+    expect(findOpenToken(text, text.length)).toEqual({ start: 17, query: "to" });
+  });
+
+  it("não sugere fora de chaves", () => {
+    expect(findOpenToken("/api/login", 5)).toBeNull();
+  });
+
+  it("olha só o que está à esquerda do caret", () => {
+    // caret antes do `{{`
+    expect(findOpenToken("abc{{ tok", 3)).toBeNull();
+  });
+
+  it("desiste quando o nome tem caractere que não é de variável", () => {
+    const text = "{{ tok/en";
+    expect(findOpenToken(text, text.length)).toBeNull();
+  });
+});
+
+describe("completeToken", () => {
+  it("insere a variável e devolve o caret depois dela", () => {
+    const text = "{{ ba";
+    const token = findOpenToken(text, text.length)!;
+    expect(completeToken(text, text.length, token, "base_url")).toEqual({
+      text: "{{ base_url }}",
+      caret: 14,
+    });
+  });
+
+  it("preserva o que vem depois do caret", () => {
+    const text = "{{ ba/api/login";
+    const token = { start: 0, query: "ba" };
+    expect(completeToken(text, 5, token, "base_url")).toEqual({
+      text: "{{ base_url }}/api/login",
+      caret: 14,
+    });
+  });
+
+  it("não duplica as chaves quando o }} já existe à frente", () => {
+    const text = "{{ ba }}/api";
+    const token = { start: 0, query: "ba" };
+    expect(completeToken(text, 5, token, "base_url")).toEqual({
+      text: "{{ base_url }}/api",
+      caret: 14,
+    });
+  });
+
+  it("completa o segundo token sem tocar no primeiro", () => {
+    const text = "{{ base_url }}/x/{{ to";
+    const token = findOpenToken(text, text.length)!;
+    const out = completeToken(text, text.length, token, "token");
+    expect(out.text).toBe("{{ base_url }}/x/{{ token }}");
   });
 });
