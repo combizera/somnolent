@@ -4,6 +4,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  Folder,
+  FolderOpen,
   FolderPlus,
   Import,
   Layers,
@@ -206,6 +208,12 @@ function FolderHeader({
         className="size-4 shrink-0 text-ink-faint transition-transform"
         style={{ transform: collapsed ? 'rotate(-90deg)' : 'none' }}
       />
+      {/* o ícone diz o tipo (pasta), o chevron diz o estado (aberta/fechada) */}
+      {collapsed ? (
+        <Folder aria-hidden className="size-3.5 shrink-0 text-ink-faint" />
+      ) : (
+        <FolderOpen aria-hidden className="size-3.5 shrink-0 text-ink-faint" />
+      )}
       {editing ? (
         <input
           autoFocus
