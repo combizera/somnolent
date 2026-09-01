@@ -4,6 +4,7 @@ import {
   completeToken,
   extractVariables,
   findOpenToken,
+  rankVariables,
   resolveRequest,
   resolveTemplate,
 } from "./template.js";
@@ -235,5 +236,37 @@ describe("completeToken", () => {
     const token = findOpenToken(text, text.length)!;
     const out = completeToken(text, text.length, token, "token");
     expect(out.text).toBe("{{ base_url }}/x/{{ token }}");
+  });
+});
+
+describe("rankVariables", () => {
+  const vars = ["base_url", "token", "page_size", "client_token", "cnj"];
+
+  it("sem query, devolve todas em ordem alfabética", () => {
+    expect(rankVariables(vars, "")).toEqual([
+      "base_url",
+      "client_token",
+      "cnj",
+      "page_size",
+      "token",
+    ]);
+  });
+
+  it("não corta a lista — variável no fim do alfabeto continua aparecendo", () => {
+    const many = Array.from({ length: 40 }, (_, i) => `var_${i}`).concat("zzz_ultima");
+    expect(rankVariables(many, "")).toHaveLength(41);
+    expect(rankVariables(many, "")).toContain("zzz_ultima");
+  });
+
+  it("quem começa com a query vem antes de quem só contém", () => {
+    expect(rankVariables(vars, "token")).toEqual(["token", "client_token"]);
+  });
+
+  it("ignora caixa", () => {
+    expect(rankVariables(["Token", "BASE_URL"], "to")).toEqual(["Token"]);
+  });
+
+  it("devolve vazio quando nada bate", () => {
+    expect(rankVariables(vars, "xyz")).toEqual([]);
   });
 });

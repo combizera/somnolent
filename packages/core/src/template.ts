@@ -185,3 +185,20 @@ export function completeToken(
     caret: token.start + insertion.length,
   };
 }
+
+/**
+ * Ordena as variáveis pro autocomplete: quem começa com o que foi digitado vem
+ * primeiro, depois quem só contém; alfabético dentro de cada grupo. Devolve a
+ * lista inteira de propósito — cortar em N esconde variável sem avisar.
+ */
+export function rankVariables(names: string[], query: string): string[] {
+  const q = query.toLowerCase();
+  const starts: string[] = [];
+  const contains: string[] = [];
+  for (const name of names) {
+    const lower = name.toLowerCase();
+    if (!lower.includes(q)) continue;
+    (lower.startsWith(q) ? starts : contains).push(name);
+  }
+  return [...starts.sort(), ...contains.sort()];
+}

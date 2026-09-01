@@ -1,6 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { completeToken, findOpenToken, type OpenToken } from '@somnolent/core'
+import {
+  completeToken,
+  findOpenToken,
+  rankVariables,
+  type OpenToken,
+} from '@somnolent/core'
 
 const TOKEN = /(\{\{\s*[\w.-]+\s*\}\})/g
 const NAME = /\{\{\s*([\w.-]+)\s*\}\}/
@@ -24,13 +29,11 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
   const [suggesting, setSuggesting] = useState<OpenToken | null>(null)
   const [highlighted, setHighlighted] = useState(0)
   const [rect, setRect] = useState<DOMRect | null>(null)
+  const listRef = useRef<HTMLUListElement>(null)
 
-  const names = suggesting
-    ? Object.keys(ctx)
-        .filter((name) => name.toLowerCase().includes(suggesting.query.toLowerCase()))
-        .sort()
-        .slice(0, 8)
-    : []
+  // Sem teto de itens: a lista rola. Cortar em N escondia variáveis sem avisar
+  // (um `token` no fim do alfabeto simplesmente não aparecia).
+  const names = suggesting ? rankVariables(Object.keys(ctx), suggesting.query) : []
   const open = suggesting !== null && names.length > 0
 
   // A lista é ancorada no input em coordenadas de viewport: ela vive num portal
@@ -50,6 +53,11 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
   useEffect(() => {
     setHighlighted(0)
   }, [suggesting?.query])
+
+  // Navegar com as setas não pode deixar o item destacado fora da área visível.
+  useEffect(() => {
+    listRef.current?.children[highlighted]?.scrollIntoView({ block: 'nearest' })
+  }, [highlighted])
 
   /** Reavalia o gatilho a partir do texto e da posição do caret. */
   const detect = (text: string, caret: number) => setSuggesting(findOpenToken(text, caret))
@@ -147,7 +155,8 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
               minWidth: Math.max(rect.width, 200),
               maxWidth: 380,
             }}
-            className="z-[60] overflow-hidden rounded-md border border-line bg-panel py-1 shadow-2xl"
+            ref={listRef}
+            className="z-[60] max-h-64 overflow-y-auto rounded-md border border-line bg-panel py-1 shadow-2xl"
           >
             {names.map((name, i) => (
               <li key={name}>
@@ -159,13 +168,13 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
                     accept(name)
                   }}
                   onMouseEnter={() => setHighlighted(i)}
-                  className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left font-mono text-xs transition ${
+                  className={`flex w-full items-baseline gap-1 px-2.5 py-1.5 text-left font-mono text-xs whitespace-pre transition ${
                     i === highlighted ? 'bg-hover text-ink' : 'text-ink-dim'
                   }`}
                 >
-                  <span className="text-brand-hi">{'{{'}</span>
-                  <span className="min-w-0 flex-1 truncate">{name}</span>
-                  <span className="text-brand-hi">{'}}'}</span>
+                  <span className="text-brand-hi/70">{'{{'}</span>
+                  <span className="min-w-0 truncate">{name}</span>
+                  <span className="text-brand-hi/70">{'}}'}</span>
                 </button>
               </li>
             ))}
