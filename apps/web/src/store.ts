@@ -1,7 +1,14 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { uniqueEnvName } from '@somnolent/core'
-import type { ApiRequest, Collection, Environment, HttpMethod } from '@somnolent/core'
+import { migrateWorkspace } from './lib/migrate'
+import { rootCollectionOf, uniqueEnvName } from '@somnolent/core'
+import type {
+  ApiRequest,
+  Collection,
+  Environment,
+  HttpMethod,
+  Project,
+} from '@somnolent/core'
 
 export interface HistoryEntry {
   id: string
@@ -17,7 +24,6 @@ export interface HistoryEntry {
   at: string
 }
 
-const WS = 'ws-local'
 const now = () => new Date().toISOString()
 const uid = () => crypto.randomUUID()
 
@@ -35,9 +41,26 @@ const nextSort = (items: { sortOrder: number }[]) =>
   items.reduce((max, it) => Math.max(max, it.sortOrder), -1) + 1
 
 function seed() {
+  const project: Project = {
+    id: uid(),
+    name: 'Pessoal',
+    sortOrder: 0,
+    version: 1,
+    updatedAt: now(),
+  }
+  // Os environments pertencem a uma collection, então o seed precisa de uma.
+  const collection: Collection = {
+    id: uid(),
+    projectId: project.id,
+    parentId: null,
+    name: 'Exemplos',
+    sortOrder: 0,
+    version: 1,
+    updatedAt: now(),
+  }
   const base: Environment = {
     id: uid(),
-    workspaceId: WS,
+    collectionId: collection.id,
     name: 'Base',
     isBase: true,
     variables: [{ key: 'page_size', value: '20', secret: false, enabled: true }],
@@ -47,7 +70,7 @@ function seed() {
   }
   const staging: Environment = {
     id: uid(),
-    workspaceId: WS,
+    collectionId: collection.id,
     name: 'staging',
     isBase: false,
     color: '#f59e0b',
@@ -61,7 +84,7 @@ function seed() {
   }
   const prod: Environment = {
     id: uid(),
-    workspaceId: WS,
+    collectionId: collection.id,
     name: 'prod',
     isBase: false,
     color: '#ef4444',
@@ -75,8 +98,8 @@ function seed() {
   }
   const request: ApiRequest = {
     id: uid(),
-    workspaceId: WS,
-    collectionId: null,
+    projectId: project.id,
+    collectionId: collection.id,
     name: 'Exemplo — GET com vars',
     method: 'GET',
     url: '{{ base_url }}/get',
@@ -92,7 +115,15 @@ function seed() {
     version: 1,
     updatedAt: now(),
   }
-  return { environments: [base, staging, prod], requests: [request], activeEnvId: staging.id, selectedRequestId: request.id }
+  return {
+    projects: [project],
+    openProjectId: project.id,
+    collections: [collection],
+    environments: [base, staging, prod],
+    requests: [request],
+    activeEnvByCollection: { [collection.id]: staging.id },
+    selectedRequestId: request.id,
+  }
 }
 
 export interface RemoteChanges {
@@ -108,10 +139,17 @@ export interface PendingDeletes {
 }
 
 interface AppState {
+  projects: Project[]
+  /** Project aberto no seletor do header — escolha local, não sincroniza. */
+  openProjectId: string | null
   collections: Collection[]
   requests: ApiRequest[]
   environments: Environment[]
-  activeEnvId: string | null
+  /**
+   * Environment ativo por collection: dá pra estar em prod numa collection e
+   * em local na outra. Escolha local, não sincroniza.
+   */
+  activeEnvByCollection: Record<string, string | null>
   selectedRequestId: string | null
   /**
    * Collection aberta na sidebar (navegação em 2 níveis, como o Insomnia).
@@ -133,6 +171,11 @@ interface AppState {
   clearPendingDeletes: (pushed: PendingDeletes) => void
   replaceAllData: () => void
   applyRemote: (changes: RemoteChanges, deletes: Partial<PendingDeletes>) => void
+
+  addProject: (name: string) => string
+  renameProject: (id: string, name: string) => void
+  deleteProject: (id: string) => void
+  openProject: (id: string) => void
 
   addCollection: (name: string) => string
   /** Entra numa collection (ou volta pra lista, com null). */
@@ -156,12 +199,12 @@ interface AppState {
     environments?: Environment[]
   }) => void
 
-  addEnvironment: () => string
+  addEnvironment: (collectionId: string) => string
   /** Reordena os environments na lista do gerenciador (o base também entra). */
   moveEnvironment: (id: string, index: number) => void
   updateEnvironment: (id: string, patch: Partial<Environment>) => void
   deleteEnvironment: (id: string) => void
-  setActiveEnv: (id: string | null) => void
+  setActiveEnv: (collectionId: string, envId: string | null) => void
 
   pushHistory: (entry: Omit<HistoryEntry, 'id' | 'at'>) => void
   clearHistory: (requestId: string) => void
@@ -170,7 +213,6 @@ interface AppState {
 export const useStore = create<AppState>()(
   persist(
     (set) => ({
-      collections: [],
       history: {},
       openCollectionId: null,
       ...seed(),
@@ -213,7 +255,7 @@ export const useStore = create<AppState>()(
           collections: [],
           requests: [],
           environments: [],
-          activeEnvId: null,
+          activeEnvByCollection: {},
           selectedRequestId: null,
           openCollectionId: null,
           history: {},
@@ -272,9 +314,65 @@ export const useStore = create<AppState>()(
             selectedRequestId: requests.some((r) => r.id === s.selectedRequestId)
               ? s.selectedRequestId
               : null,
-            activeEnvId: environments.some((e) => e.id === s.activeEnvId) ? s.activeEnvId : null,
+            // env que sumiu no remoto não pode ficar ativo em collection nenhuma
+            activeEnvByCollection: Object.fromEntries(
+              Object.entries(s.activeEnvByCollection).map(([colId, envId]) => [
+                colId,
+                environments.some((e) => e.id === envId) ? envId : null,
+              ]),
+            ),
           }
         }),
+
+      addProject: (name) => {
+        const id = uid()
+        set((s) => ({
+          projects: [
+            ...s.projects,
+            { id, name, sortOrder: nextSort(s.projects), version: 1, updatedAt: now() },
+          ],
+        }))
+        return id
+      },
+
+      renameProject: (id, name) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === id ? { ...p, name, version: p.version + 1, updatedAt: now() } : p,
+          ),
+        })),
+
+      /** Apagar um project leva as collections dele (e o que pende delas). */
+      deleteProject: (id) =>
+        set((s) => {
+          if (s.projects.length <= 1) return s // sempre sobra um project
+          const colIds = new Set(s.collections.filter((c) => c.projectId === id).map((c) => c.id))
+          const reqIds = s.requests
+            .filter((r) => r.projectId === id || (r.collectionId && colIds.has(r.collectionId)))
+            .map((r) => r.id)
+          const envIds = s.environments
+            .filter((e) => colIds.has(e.collectionId))
+            .map((e) => e.id)
+          const projects = s.projects.filter((p) => p.id !== id)
+          return {
+            projects,
+            collections: s.collections.filter((c) => !colIds.has(c.id)),
+            requests: s.requests.filter((r) => !reqIds.includes(r.id)),
+            environments: s.environments.filter((e) => !envIds.includes(e.id)),
+            openProjectId: s.openProjectId === id ? (projects[0]?.id ?? null) : s.openProjectId,
+            openCollectionId: colIds.has(s.openCollectionId ?? '') ? null : s.openCollectionId,
+            selectedRequestId: reqIds.includes(s.selectedRequestId ?? '')
+              ? null
+              : s.selectedRequestId,
+            pendingDeletes: {
+              collections: [...s.pendingDeletes.collections, ...colIds],
+              requests: [...s.pendingDeletes.requests, ...reqIds],
+              environments: [...s.pendingDeletes.environments, ...envIds],
+            },
+          }
+        }),
+
+      openProject: (id) => set({ openProjectId: id, openCollectionId: null }),
 
       addCollection: (name) => {
         const id = uid()
@@ -283,7 +381,7 @@ export const useStore = create<AppState>()(
             ...s.collections,
             {
               id,
-              workspaceId: WS,
+              projectId: s.openProjectId ?? s.projects[0]!.id,
               parentId: null,
               name,
               sortOrder: nextSort(s.collections.filter((c) => c.parentId === null)),
@@ -303,7 +401,10 @@ export const useStore = create<AppState>()(
             ...s.collections,
             {
               id: uid(),
-              workspaceId: WS,
+              projectId:
+                s.collections.find((c) => c.id === parentId)?.projectId ??
+                s.openProjectId ??
+                s.projects[0]!.id,
               parentId,
               name,
               sortOrder: nextSort(s.collections.filter((c) => c.parentId === parentId)),
@@ -333,9 +434,14 @@ export const useStore = create<AppState>()(
           const doomed = s.requests
             .filter((r) => r.collectionId !== null && allColIds.has(r.collectionId))
             .map((r) => r.id)
+          // environment pertence à collection: apagar a collection apaga os envs dela
+          const doomedEnvs = s.environments
+            .filter((e) => allColIds.has(e.collectionId))
+            .map((e) => e.id)
           return {
             collections: s.collections.filter((c) => !allColIds.has(c.id)),
             requests: s.requests.filter((r) => !doomed.includes(r.id)),
+            environments: s.environments.filter((e) => !doomedEnvs.includes(e.id)),
             selectedRequestId: doomed.includes(s.selectedRequestId ?? '')
               ? null
               : s.selectedRequestId,
@@ -347,6 +453,7 @@ export const useStore = create<AppState>()(
               ...s.pendingDeletes,
               collections: [...s.pendingDeletes.collections, ...allColIds],
               requests: [...s.pendingDeletes.requests, ...doomed],
+              environments: [...s.pendingDeletes.environments, ...doomedEnvs],
             },
           }
         }),
@@ -358,7 +465,12 @@ export const useStore = create<AppState>()(
             ...s.requests,
             {
               id,
-              workspaceId: WS,
+              projectId:
+                (collectionId
+                  ? s.collections.find((c) => c.id === collectionId)?.projectId
+                  : undefined) ??
+                s.openProjectId ??
+                s.projects[0]!.id,
               collectionId,
               name: 'Nova request',
               method: 'GET' as const,
@@ -522,27 +634,31 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      addEnvironment: () => {
+      addEnvironment: (collectionId) => {
         const id = uid()
-        set((s) => ({
-          environments: [
-            ...s.environments,
-            {
-              id,
-              workspaceId: WS,
-              name: uniqueEnvName(
-                'novo-env',
-                s.environments.map((e) => e.name),
-              ),
-              isBase: false,
-              color: '#8b5cf6',
-              variables: [],
-              sortOrder: nextSort(s.environments),
-              version: 1,
-              updatedAt: now(),
-            },
-          ],
-        }))
+        set((s) => {
+          // nome único e ordem contam só dentro da collection dona
+          const siblings = s.environments.filter((e) => e.collectionId === collectionId)
+          return {
+            environments: [
+              ...s.environments,
+              {
+                id,
+                collectionId,
+                name: uniqueEnvName(
+                  'novo-env',
+                  siblings.map((e) => e.name),
+                ),
+                isBase: false,
+                color: '#8b5cf6',
+                variables: [],
+                sortOrder: nextSort(siblings),
+                version: 1,
+                updatedAt: now(),
+              },
+            ],
+          }
+        })
         return id
       },
 
@@ -556,21 +672,32 @@ export const useStore = create<AppState>()(
       deleteEnvironment: (id) =>
         set((s) => ({
           environments: s.environments.filter((e) => e.id !== id || e.isBase),
-          activeEnvId: s.activeEnvId === id ? null : s.activeEnvId,
+          activeEnvByCollection: Object.fromEntries(
+            Object.entries(s.activeEnvByCollection).map(([colId, envId]) => [
+              colId,
+              envId === id ? null : envId,
+            ]),
+          ),
           pendingDeletes: {
             ...s.pendingDeletes,
             environments: [...s.pendingDeletes.environments, id],
           },
         })),
 
-      setActiveEnv: (id) => set({ activeEnvId: id }),
+      setActiveEnv: (collectionId, envId) =>
+        set((s) => ({
+          activeEnvByCollection: { ...s.activeEnvByCollection, [collectionId]: envId },
+        })),
 
       moveEnvironment: (id, index) =>
         set((s) => {
           const moved = s.environments.find((e) => e.id === id)
           if (!moved) return s
 
-          const others = s.environments.filter((e) => e.id !== id).sort(bySortOrder)
+          // a ordem é relativa aos envs da mesma collection
+          const others = s.environments
+            .filter((e) => e.id !== id && e.collectionId === moved.collectionId)
+            .sort(bySortOrder)
           const clamped = Math.max(0, Math.min(index, others.length))
           const ordered = [...others.slice(0, clamped), moved, ...others.slice(clamped)]
           const position = new Map(ordered.map((e, i) => [e.id, i]))
@@ -609,33 +736,51 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'somnolent-workspace',
-      version: 1,
-      /**
-       * v0 → v1: `Environment.sortOrder` não existia e a ordem era a de
-       * inserção. Congela essa ordem em números pra quem já tinha workspace
-       * salvo — sem isso o sort compara `undefined` e a lista embaralha.
-       */
-      migrate: (persisted, version) => {
-        const state = persisted as { environments?: Environment[] } | undefined
-        if (!state || version >= 1) return state as never
-        return {
-          ...state,
-          environments: (state.environments ?? []).map((env, i) => ({
-            ...env,
-            sortOrder: typeof env.sortOrder === 'number' ? env.sortOrder : i,
-          })),
-        } as never
-      },
+      version: 2,
+      migrate: (persisted, version) => migrateWorkspace(persisted, version) as never,
     },
   ),
 )
 
+/**
+ * Collection que manda no contexto de variáveis agora: a raiz da request
+ * aberta ou, sem request, a collection aberta na sidebar. Environment pertence
+ * à collection, então sem collection não há variável.
+ */
+export function useContextCollectionId(): string | null {
+  return useStore((s) => {
+    const selected = s.requests.find((r) => r.id === s.selectedRequestId)
+    const from = selected?.collectionId ?? s.openCollectionId
+    return rootCollectionOf(s.collections, from)?.id ?? null
+  })
+}
+
 export function useActiveEnv() {
-  return useStore((s) => s.environments.find((e) => e.id === s.activeEnvId) ?? null)
+  const collectionId = useContextCollectionId()
+  return useStore((s) => {
+    if (!collectionId) return null
+    const activeId = s.activeEnvByCollection[collectionId]
+    if (!activeId) return null
+    return (
+      s.environments.find((e) => e.id === activeId && e.collectionId === collectionId) ?? null
+    )
+  })
 }
 
 export function useBaseEnv() {
-  return useStore((s) => s.environments.find((e) => e.isBase) ?? null)
+  const collectionId = useContextCollectionId()
+  return useStore((s) =>
+    collectionId
+      ? (s.environments.find((e) => e.isBase && e.collectionId === collectionId) ?? null)
+      : null,
+  )
+}
+
+/** Environments da collection em contexto, na ordem escolhida. */
+export function useCollectionEnvs(collectionId: string | null): Environment[] {
+  return useStore((s) =>
+    collectionId ? s.environments.filter((e) => e.collectionId === collectionId) : [],
+  )
 }
 
 export function useSelectedRequest() {

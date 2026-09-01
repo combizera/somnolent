@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Eye, EyeOff, GripVertical, Plus, Trash2, TriangleAlert, X } from 'lucide-react'
 import { duplicateEnvIds, duplicateVarIndexes } from '@somnolent/core'
 import type { Environment, EnvironmentVariable } from '@somnolent/core'
-import { bySortOrder, useStore } from '../store'
+import { bySortOrder, useCollectionEnvs, useStore } from '../store'
 
 const SWATCHES = ['#efa14e', '#e0525f', '#58ad4c', '#4f97e8', '#7c5cff', '#e06fb4']
 
@@ -122,8 +122,17 @@ function VariableRows({ env }: { env: Environment }) {
   )
 }
 
-export function EnvManager({ onClose }: { onClose: () => void }) {
-  const environments = useStore((s) => s.environments)
+export function EnvManager({
+  collectionId,
+  collectionName,
+  onClose,
+}: {
+  collectionId: string
+  collectionName: string
+  onClose: () => void
+}) {
+  // Environments desta collection — outra collection tem os seus.
+  const environments = useCollectionEnvs(collectionId)
   const addEnvironment = useStore((s) => s.addEnvironment)
   const updateEnvironment = useStore((s) => s.updateEnvironment)
   const deleteEnvironment = useStore((s) => s.deleteEnvironment)
@@ -161,12 +170,17 @@ export function EnvManager({ onClose }: { onClose: () => void }) {
         className="flex h-[620px] w-full max-w-5xl overflow-hidden rounded-lg border border-line bg-panel shadow-2xl"
       >
         <div className="flex w-60 shrink-0 flex-col border-r border-line bg-app">
-          <p
-            className="px-3 pt-3 pb-1 text-[10px] font-semibold tracking-wider text-ink-faint uppercase"
-            title="Arraste para reordenar"
-          >
-            Environments
-          </p>
+          <div className="flex flex-col gap-0.5 px-3 pt-3 pb-1">
+            <p
+              className="text-[10px] font-semibold tracking-wider text-ink-faint uppercase"
+              title="Arraste para reordenar"
+            >
+              Environments
+            </p>
+            <p className="truncate text-[11px] text-ink-dim" title={collectionName}>
+              {collectionName}
+            </p>
+          </div>
           <div
             className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2"
             onDragOver={(e) => {
@@ -247,7 +261,7 @@ export function EnvManager({ onClose }: { onClose: () => void }) {
             ))}
           </div>
           <button
-            onClick={() => setSelectedId(addEnvironment())}
+            onClick={() => setSelectedId(addEnvironment(collectionId))}
             className="m-2 flex items-center justify-center gap-1 rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
           >
             <Plus className="size-3.5" />

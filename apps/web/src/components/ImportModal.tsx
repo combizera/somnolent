@@ -53,7 +53,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         return
       }
       const result = await importInsomniaExport(trimmed, {
-        workspaceId: 'ws-local',
+        projectId: useStore.getState().openProjectId ?? '',
         makeId: () => crypto.randomUUID(),
         now: () => new Date().toISOString(),
       })

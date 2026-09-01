@@ -387,6 +387,7 @@ export function Sidebar() {
   const moveRequest = useStore((s) => s.moveRequest)
   const moveCollection = useStore((s) => s.moveCollection)
   const openCollectionId = useStore((s) => s.openCollectionId)
+  const openProjectId = useStore((s) => s.openProjectId)
   const openCollection = useStore((s) => s.openCollection)
   const renameCollection = useStore((s) => s.renameCollection)
 
@@ -404,9 +405,13 @@ export function Sidebar() {
     return () => document.body.classList.remove('is-dragging')
   }, [drag])
 
+  // Só as collections do project aberto: dois projects não se misturam na lista.
   const sortedCollections = useMemo(
-    () => [...collections].sort(bySortOrder),
-    [collections],
+    () =>
+      [...collections]
+        .filter((c) => c.projectId === openProjectId)
+        .sort(bySortOrder),
+    [collections, openProjectId],
   )
 
   // A collection aberta pode não existir mais (delete remoto pelo sync, cache
@@ -442,13 +447,14 @@ export function Sidebar() {
   const q = filter.toLowerCase().trim()
 
   const visible = useMemo(() => {
+    const mine = requests.filter((r) => r.projectId === openProjectId)
     const list = q
-      ? requests.filter(
+      ? mine.filter(
           (r) => r.name.toLowerCase().includes(q) || r.url.toLowerCase().includes(q),
         )
-      : requests
+      : mine
     return [...list].sort(bySortOrder)
-  }, [q, requests])
+  }, [q, requests, openProjectId])
 
   const inFolder = (id: string | null) => visible.filter((r) => r.collectionId === id)
   const looseRequests = inFolder(null)

@@ -2,6 +2,7 @@ import { Logo } from './components/Logo'
 import { Sidebar } from './components/Sidebar'
 import { Search } from 'lucide-react'
 import { EnvSelector } from './components/EnvSelector'
+import { ProjectSelector } from './components/ProjectSelector'
 import { SyncPanel } from './components/SyncPanel'
 import { CommandPalette } from './components/CommandPalette'
 import { RequestPanel } from './components/RequestPanel'
@@ -45,6 +46,7 @@ function App() {
         </button>
 
         <div className="flex items-center gap-2">
+          <ProjectSelector />
           <SyncPanel />
           <EnvSelector />
         </div>
