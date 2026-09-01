@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Boxes, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { bySortOrder, useStore } from '../store'
+import { useConfirm } from '../lib/confirm'
 
 /**
  * Seletor de project no header. Project é o nível acima da collection e a
@@ -14,6 +15,7 @@ export function ProjectSelector() {
   const addProject = useStore((s) => s.addProject)
   const renameProject = useStore((s) => s.renameProject)
   const deleteProject = useStore((s) => s.deleteProject)
+  const confirm = useConfirm()
   const [editing, setEditing] = useState(false)
 
   const sorted = [...projects].sort(bySortOrder)
@@ -67,9 +69,15 @@ export function ProjectSelector() {
       </button>
       {projects.length > 1 && (
         <button
-          onClick={() => {
-            if (confirm(`Excluir o project "${open.name}" e todas as collections dele?`))
-              deleteProject(open.id)
+          onClick={async () => {
+            const ok = await confirm({
+              title: `Excluir o project "${open.name}"?`,
+              message:
+                'Todas as collections dele, com requests e environments, são apagadas desta máquina.',
+              confirmLabel: 'Excluir project',
+              danger: true,
+            })
+            if (ok) deleteProject(open.id)
           }}
           className="border-l border-line bg-panel px-2 text-ink-faint transition hover:bg-bad/10 hover:text-bad"
           title="Excluir project"

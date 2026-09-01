@@ -12,10 +12,12 @@ import {
   Import,
   Layers,
   Plus,
+  Trash2,
   X,
 } from 'lucide-react'
 import type { ApiRequest, Collection } from '@somnolent/core'
 import { bySortOrder, useStore } from '../store'
+import { useConfirm } from '../lib/confirm'
 import { ImportModal } from './ImportModal'
 import { MethodChip } from './MethodChip'
 
@@ -62,6 +64,7 @@ function RequestRow({
   const selectRequest = useStore((s) => s.selectRequest)
   const deleteRequest = useStore((s) => s.deleteRequest)
   const duplicateRequest = useStore((s) => s.duplicateRequest)
+  const confirm = useConfirm()
   const selected = selectedId === request.id
   const isSource = drag?.kind === 'request' && drag.id === request.id
   const here = spot?.kind === 'request' && spot.id === request.id ? spot : null
@@ -120,9 +123,15 @@ function RequestRow({
           <Copy className="size-3.5" />
         </button>
         <button
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation()
-            if (confirm(`Excluir "${request.name}"?`)) deleteRequest(request.id)
+            const ok = await confirm({
+              title: `Excluir a request "${request.name}"?`,
+              message: 'O histórico de respostas dela some junto. Não dá pra desfazer.',
+              confirmLabel: 'Excluir request',
+              danger: true,
+            })
+            if (ok) deleteRequest(request.id)
           }}
           className="rounded px-1 text-ink-faint hover:text-bad"
           title="Excluir request"
@@ -166,6 +175,7 @@ function FolderHeader({
   const renameCollection = useStore((s) => s.renameCollection)
   const deleteCollection = useStore((s) => s.deleteCollection)
   const addRequest = useStore((s) => s.addRequest)
+  const confirm = useConfirm()
 
   const here = spot?.kind === 'collection' && spot.id === col.id ? spot : null
   const isSource = drag?.kind === 'collection' && drag.id === col.id
@@ -265,10 +275,15 @@ function FolderHeader({
           <FolderPlus className="size-3.5" />
         </button>
         <button
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation()
-            if (confirm(`Excluir a pasta "${col.name}" e suas requests?`))
-              deleteCollection(col.id)
+            const ok = await confirm({
+              title: `Excluir a pasta "${col.name}"?`,
+              message: 'As requests e subpastas dentro dela vão junto.',
+              confirmLabel: 'Excluir pasta',
+              danger: true,
+            })
+            if (ok) deleteCollection(col.id)
           }}
           className="px-1 text-ink-faint hover:text-bad"
           title="Excluir pasta"
@@ -297,7 +312,6 @@ function CollectionRow({
 }: DragProps & { col: Collection; count: number }) {
   const openCollection = useStore((s) => s.openCollection)
   const renameCollection = useStore((s) => s.renameCollection)
-  const deleteCollection = useStore((s) => s.deleteCollection)
   const [editing, setEditing] = useState(false)
 
   const here = spot?.kind === 'collection' && spot.id === col.id ? spot : null
@@ -368,18 +382,8 @@ function CollectionRow({
         </span>
       )}
       <span className="shrink-0 font-mono text-[10px] text-ink-faint">{count}</span>
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          if (confirm(`Excluir a collection "${col.name}" e todo o conteúdo dela?`))
-            deleteCollection(col.id)
-        }}
-        className="shrink-0 rounded px-1 text-ink-faint opacity-0 transition group-hover:opacity-100 hover:text-bad"
-        title="Excluir collection"
-        aria-label="Excluir collection"
-      >
-        <X className="size-3.5" />
-      </button>
+      {/* Apagar collection não fica aqui: é destrutivo demais pra um alvo que
+          divide hover com o clique de abrir. Mora dentro da collection. */}
       <ChevronRight aria-hidden className="size-4 shrink-0 text-ink-faint" />
     </div>
   )
@@ -402,6 +406,8 @@ export function Sidebar() {
   const collapseFolders = useStore((s) => s.collapseFolders)
   const openCollection = useStore((s) => s.openCollection)
   const renameCollection = useStore((s) => s.renameCollection)
+  const deleteCollection = useStore((s) => s.deleteCollection)
+  const confirm = useConfirm()
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [renamingOpen, setRenamingOpen] = useState(false)
@@ -703,6 +709,22 @@ export function Sidebar() {
                   {open.name}
                 </span>
               )}
+              <button
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `Excluir a collection "${open.name}"?`,
+                    message: `${countsByCollection.get(open.id) ?? 0} request(s), as pastas e os environments dela são apagados. Não dá pra desfazer.`,
+                    confirmLabel: 'Excluir collection',
+                    danger: true,
+                  })
+                  if (ok) deleteCollection(open.id)
+                }}
+                className="shrink-0 rounded px-1.5 py-1 text-ink-faint transition hover:bg-bad/10 hover:text-bad"
+                title="Excluir esta collection"
+                aria-label="Excluir esta collection"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
             </div>
             <div className="flex items-center gap-1">
               <button

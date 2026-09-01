@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 import { useStore } from './store'
 
@@ -247,5 +247,76 @@ describe('arrastar request', () => {
     // dentro de uma collection, "fora de pasta" é a própria collection —
     // não a raiz do workspace
     expect(requestAtual(request.id).collectionId).toBe(collection.id)
+  })
+})
+
+describe('tela vazia e exclusão', () => {
+  it('sem request aberta, mostra os caminhos de saída em vez de um vazio seco', () => {
+    const s = useStore.getState()
+    s.selectRequest(null)
+    s.openCollection(null)
+    render(<App />)
+
+    // os mesmos rótulos existem na sidebar; aqui interessa a área central
+    const main = within(screen.getByRole('region', { name: 'Nenhuma request aberta' }))
+    expect(main.getByText('Escolha uma collection')).toBeDefined()
+    expect(main.getByText('Nova collection')).toBeDefined()
+    expect(main.getByText('Importar do Insomnia')).toBeDefined()
+    expect(main.getByText('Buscar request')).toBeDefined()
+  })
+
+  it('dentro de uma collection, o texto muda pra ela', () => {
+    const s = useStore.getState()
+    const collection = s.collections.find((c) => c.parentId === null)!
+    s.selectRequest(null)
+    s.openCollection(collection.id)
+    render(<App />)
+
+    const main = within(screen.getByRole('region', { name: 'Nenhuma request aberta' }))
+    expect(main.getAllByText(collection.name).length).toBeGreaterThan(0)
+    expect(main.getByText('Nova request')).toBeDefined()
+    // criar collection não faz sentido aqui dentro
+    expect(main.queryByText('Nova collection')).toBeNull()
+  })
+
+  it('a lista de collections não tem mais botão de apagar', () => {
+    const s = useStore.getState()
+    s.openCollection(null)
+    render(<App />)
+    const sidebar = within(screen.getByRole('complementary'))
+    expect(sidebar.queryByLabelText('Excluir collection')).toBeNull()
+  })
+
+  it('apagar collection pede confirmação num diálogo do app, não do navegador', async () => {
+    const s = useStore.getState()
+    const collection = s.collections.find((c) => c.parentId === null)!
+    s.openCollection(collection.id)
+    render(<App />)
+
+    fireEvent.click(screen.getByLabelText('Excluir esta collection'))
+
+    const dialogo = screen.getByRole('alertdialog')
+    expect(within(dialogo).getByText(`Excluir a collection "${collection.name}"?`)).toBeDefined()
+    // nada foi apagado só por abrir
+    expect(useStore.getState().collections.some((c) => c.id === collection.id)).toBe(true)
+
+    fireEvent.click(within(dialogo).getByText('Excluir collection'))
+    // o diálogo resolve por promise: a exclusão acontece no microtask seguinte
+    await waitFor(() =>
+      expect(useStore.getState().collections.some((c) => c.id === collection.id)).toBe(false),
+    )
+  })
+
+  it('cancelar no diálogo não apaga nada', () => {
+    const s = useStore.getState()
+    const collection = s.collections.find((c) => c.parentId === null)!
+    s.openCollection(collection.id)
+    render(<App />)
+
+    fireEvent.click(screen.getByLabelText('Excluir esta collection'))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByText('Cancelar'))
+
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(useStore.getState().collections.some((c) => c.id === collection.id)).toBe(true)
   })
 })

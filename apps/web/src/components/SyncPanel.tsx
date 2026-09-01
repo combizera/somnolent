@@ -3,6 +3,7 @@ import { Check, Copy, Eye, KeyRound, Link2, Plus, Trash2 } from 'lucide-react'
 import { api, ApiError, type KeyRow } from '../lib/api'
 import { onSyncStatus, syncNow, type SyncStatus } from '../lib/sync'
 import { useStore } from '../store'
+import { useConfirm } from '../lib/confirm'
 
 function useSyncStatus() {
   const [status, setStatus] = useState<SyncStatus>('off')
@@ -219,6 +220,7 @@ function Connected() {
   const collections = useStore((s) => s.collections)
   const openProjectId = useStore((s) => s.openProjectId)
   const status = useSyncStatus()
+  const confirm = useConfirm()
 
   const [keys, setKeys] = useState<KeyRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -370,9 +372,14 @@ function Connected() {
               </span>
               {!readOnly && !k.mine && (
                 <button
-                  onClick={() => {
-                    if (!confirm(`Revogar a chave "${k.label}"? Quem a tem perde o acesso agora.`))
-                      return
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: `Revogar a chave "${k.label}"?`,
+                      message: 'Quem estiver usando ela perde o acesso na hora, sem aviso.',
+                      confirmLabel: 'Revogar',
+                      danger: true,
+                    })
+                    if (!ok) return
                     api
                       .revokeKey(key, k.id)
                       .then(load)

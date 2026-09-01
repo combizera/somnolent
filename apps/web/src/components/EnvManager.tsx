@@ -3,6 +3,7 @@ import { Eye, EyeOff, GripVertical, Plus, Trash2, TriangleAlert, X } from 'lucid
 import { duplicateEnvIds, duplicateVarIndexes } from '@somnolent/core'
 import type { Environment, EnvironmentVariable } from '@somnolent/core'
 import { bySortOrder, useCollectionEnvs, useStore } from '../store'
+import { useConfirm } from '../lib/confirm'
 
 const SWATCHES = ['#efa14e', '#e0525f', '#58ad4c', '#4f97e8', '#7c5cff', '#e06fb4']
 
@@ -137,6 +138,7 @@ export function EnvManager({
   const updateEnvironment = useStore((s) => s.updateEnvironment)
   const deleteEnvironment = useStore((s) => s.deleteEnvironment)
   const moveEnvironment = useStore((s) => s.moveEnvironment)
+  const confirm = useConfirm()
   const [selectedId, setSelectedId] = useState<string | null>(
     environments.find((e) => !e.isBase)?.id ?? environments[0]?.id ?? null,
   )
@@ -316,11 +318,16 @@ export function EnvManager({
                       ))}
                     </div>
                     <button
-                      onClick={() => {
-                        if (confirm(`Excluir o environment "${selected.name}"?`)) {
-                          deleteEnvironment(selected.id)
-                          setSelectedId(environments.find((e) => e.isBase)?.id ?? null)
-                        }
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: `Excluir o environment "${selected.name}"?`,
+                          message: 'As variáveis dele se perdem, inclusive as secretas.',
+                          confirmLabel: 'Excluir environment',
+                          danger: true,
+                        })
+                        if (!ok) return
+                        deleteEnvironment(selected.id)
+                        setSelectedId(environments.find((e) => e.isBase)?.id ?? null)
                       }}
                       className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-sm text-ink-faint transition hover:bg-bad/10 hover:text-bad"
                     >
