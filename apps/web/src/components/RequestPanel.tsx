@@ -124,9 +124,9 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
     }
     setSending(request.id, true)
     let result = await sendRequest(final)
-    // CORS bloqueou no navegador? Se estamos logados, tenta pelo proxy do servidor.
+    // Falhou sem resposta (CORS, offline)? Se estamos logados, tenta pelo proxy do servidor.
     const token = useStore.getState().auth.token
-    if (!result.ok && token && result.message.includes('CORS')) {
+    if (!result.ok && result.network && token) {
       result = await api.proxy(token, final)
     }
     setSending(request.id, false)
