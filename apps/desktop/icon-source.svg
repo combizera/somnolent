@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 72 72" fill="none" role="img" aria-label="Somnolent">
+  <defs>
+    <linearGradient id="crescent" x1="14" y1="16" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#c4b0ff"/>
+      <stop offset="100%" stop-color="#5b3fd4"/>
+    </linearGradient>
+    <mask id="bite">
+      <rect width="72" height="72" fill="white"/>
+      <circle cx="44" cy="30" r="19.5" fill="black"/>
+    </mask>
+  </defs>
+  <!-- plate: a estrela é branca, então precisa de fundo escuro pra existir em dock/taskbar claro -->
+  <rect width="72" height="72" rx="16" fill="#1c1c23"/>
+  <circle cx="35" cy="37" r="21" fill="url(#crescent)" mask="url(#bite)"/>
+  <path d="M50 19 L51.4 22.6 L55 24 L51.4 25.4 L50 29 L48.6 25.4 L45 24 L48.6 22.6 Z" fill="#ffffff" opacity="0.9"/>
+</svg>

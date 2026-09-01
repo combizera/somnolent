@@ -1,3 +1,4 @@
+import { Logo } from './components/Logo'
 import { Sidebar } from './components/Sidebar'
 import { Search } from 'lucide-react'
 import { EnvSelector } from './components/EnvSelector'
@@ -24,9 +25,7 @@ function App() {
 
       <header className="flex h-11 shrink-0 items-center justify-between gap-4 border-b border-line px-3">
         <div className="flex items-center gap-2">
-          <span className="grid size-5 place-items-center rounded-md bg-brand text-[11px] font-bold text-white">
-            S
-          </span>
+          <Logo className="size-5 shrink-0" />
           <span className="text-sm font-semibold">Somnolent</span>
         </div>
 
