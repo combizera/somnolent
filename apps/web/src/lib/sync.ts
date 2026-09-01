@@ -1,4 +1,4 @@
-import type { Environment } from '@somnolent/core'
+import { rootCollectionOf, type ApiRequest, type Collection, type Environment } from '@somnolent/core'
 import { api, wsUrl } from './api'
 import { useStore, type PendingDeletes, type RemoteChanges } from '../store'
 
@@ -14,6 +14,20 @@ export function onSyncStatus(l: (s: SyncStatus) => void) {
   listeners.add(l)
   l(status)
   return () => listeners.delete(l)
+}
+
+/**
+ * O servidor filtra o escopo de uma chave de collection pelo
+ * `rootCollectionId` de cada linha — e quem sabe a hierarquia é o cliente.
+ * Sem esta anotação, requests e subpastas subiriam sem escopo e ficariam
+ * invisíveis pra quem entrou com uma chave de collection.
+ */
+export function withScope(collections: Collection[]) {
+  const rootOf = (id: string | null) => rootCollectionOf(collections, id)?.id ?? null
+  return {
+    collection: (c: Collection) => ({ ...c, rootCollectionId: rootOf(c.id) }),
+    request: (r: ApiRequest) => ({ ...r, rootCollectionId: rootOf(r.collectionId) }),
+  }
 }
 
 /** Valores de variáveis secretas nunca saem desta máquina. */
@@ -41,6 +55,7 @@ export async function syncNow(): Promise<void> {
 
   try {
     const since = s.lastSyncAt
+    const scope = withScope(s.collections)
     const changedOnly = <T extends { updatedAt: string }>(items: T[]) =>
       since ? items.filter((it) => it.updatedAt > since) : items
 
@@ -58,8 +73,8 @@ export async function syncNow(): Promise<void> {
       changes: readOnly
         ? {}
         : {
-            collections: changedOnly(s.collections),
-            requests: changedOnly(s.requests),
+            collections: changedOnly(s.collections).map(scope.collection),
+            requests: changedOnly(s.requests).map(scope.request),
             environments: changedOnly(s.environments).map(stripSecrets),
           },
       deletes: readOnly ? {} : { ...pushedDeletes },
