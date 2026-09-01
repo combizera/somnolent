@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
+import { EditorView } from '@codemirror/view'
 import { useStore, type HistoryEntry } from '../store'
 import { useSession } from '../sessionStore'
 import { formatSize, formatTime } from '../lib/send'
@@ -9,6 +10,8 @@ import { formatSize, formatTime } from '../lib/send'
 type Tab = 'body' | 'headers' | 'history'
 
 const NO_HISTORY: HistoryEntry[] = []
+
+const WRAP = EditorView.lineWrapping
 
 /** Faixa de status → cor semântica (independente da marca e do environment). */
 function statusChip(status: number) {
@@ -140,7 +143,9 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
                     <CodeMirror
                       value={text}
                       readOnly
-                      extensions={isJson ? [json()] : []}
+                      // Quebra a linha em vez de abrir scroll lateral: resposta
+                      // com uma linha gigante é a regra, não a exceção.
+                      extensions={isJson ? [json(), WRAP] : [WRAP]}
                       theme="dark"
                       height="100%"
                       style={{ height: '100%' }}

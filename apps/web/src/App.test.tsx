@@ -147,3 +147,21 @@ describe('path params (:id)', () => {
     expect(enviar.disabled).toBe(false)
   })
 })
+
+describe('editores de código', () => {
+  it('quebram a linha em vez de abrir scroll lateral', () => {
+    const s = useStore.getState()
+    const id = s.requests[0]!.id
+    s.selectRequest(id)
+    s.updateRequest(id, {
+      bodyType: 'json',
+      body: JSON.stringify({ send: ['x'.repeat(400)] }),
+    })
+    const { container } = render(<App />)
+    // há duas abas "Body" na tela (request e response); a primeira é a da request
+    fireEvent.click(screen.getAllByRole('button', { name: /^Body/ })[0]!)
+
+    // classe que o CodeMirror aplica quando lineWrapping está ligado
+    expect(container.querySelector('.cm-lineWrapping')).not.toBeNull()
+  })
+})

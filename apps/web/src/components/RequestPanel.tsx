@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Check, ChevronDown, Eye, EyeOff, Loader2, Send } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
+import { EditorView } from '@codemirror/view'
 import {
   buildContext,
   extractPathParams,
@@ -535,7 +536,11 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
                 <CodeMirror
                   value={request.body ?? ''}
                   onChange={(body) => updateRequest(request.id, { body })}
-                  extensions={request.bodyType === 'json' ? [json()] : []}
+                  extensions={
+                    request.bodyType === 'json'
+                      ? [json(), EditorView.lineWrapping]
+                      : [EditorView.lineWrapping]
+                  }
                   theme="dark"
                   height="100%"
                   style={{ height: '100%' }}

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/view": "^6.43.10",
     "@somnolent/core": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
     "@uiw/react-codemirror": "^4.25.11",
