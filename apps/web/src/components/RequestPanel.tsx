@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Check, ChevronDown, Loader2, Send } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import {
@@ -191,22 +192,22 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
       <div className="flex flex-col gap-2 p-3">
         {/* grupo conectado: método · url · enviar */}
         <div className="flex items-stretch overflow-hidden rounded-md border border-line bg-app focus-within:border-brand">
-          <select
-            value={request.method}
-            onChange={(e) => updateRequest(request.id, { method: e.target.value as HttpMethod })}
-            className={`cursor-pointer appearance-none border-r border-line bg-raised py-2 pr-7 pl-3 font-mono text-xs font-bold focus:outline-none ${METHOD_TEXT[request.method]}`}
-            style={{
-              backgroundImage:
-                "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%239a9aad' d='M3 4.5L6 8l3-3.5z'/%3E%3C/svg%3E\")",
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 8px center',
-              backgroundSize: '12px',
-            }}
-          >
-            {METHODS.map((m) => (
-              <option key={m}>{m}</option>
-            ))}
-          </select>
+          {/* o chevron é um ícone sobreposto, não background-image: assim segue o tema */}
+          <div className="relative shrink-0 border-r border-line bg-raised">
+            <select
+              value={request.method}
+              onChange={(e) => updateRequest(request.id, { method: e.target.value as HttpMethod })}
+              className={`h-full cursor-pointer appearance-none bg-transparent py-2 pr-7 pl-3 font-mono text-xs font-bold focus:outline-none ${METHOD_TEXT[request.method]}`}
+            >
+              {METHODS.map((m) => (
+                <option key={m}>{m}</option>
+              ))}
+            </select>
+            <ChevronDown
+              aria-hidden
+              className="pointer-events-none absolute top-1/2 right-2 size-3 -translate-y-1/2 text-ink-faint"
+            />
+          </div>
           <div className="min-w-0 flex-1">
             <TemplateInput
               value={request.url}
@@ -218,9 +219,14 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
           <button
             onClick={send}
             disabled={sending || !request.url.trim()}
-            className="shrink-0 bg-brand px-5 text-sm font-semibold text-white transition hover:bg-brand-hi disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex shrink-0 items-center gap-1.5 bg-brand px-5 text-sm font-semibold text-white transition hover:bg-brand-hi disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {sending ? '…' : 'Enviar'}
+            {sending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Send className="size-4" />
+            )}
+            Enviar
           </button>
         </div>
 
@@ -245,7 +251,14 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
             className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-ink-faint transition hover:bg-raised hover:text-ink"
             title="Copiar como comando curl (com variáveis resolvidas)"
           >
-            {copied ? 'copiado ✓' : 'cURL'}
+            {copied ? (
+              <span className="flex items-center gap-1">
+                <Check className="size-3" />
+                copiado
+              </span>
+            ) : (
+              'cURL'
+            )}
           </button>
         </div>
       </div>

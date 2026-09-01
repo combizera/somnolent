@@ -1,4 +1,5 @@
 import { Sidebar } from './components/Sidebar'
+import { Search } from 'lucide-react'
 import { EnvSelector } from './components/EnvSelector'
 import { SyncPanel } from './components/SyncPanel'
 import { CommandPalette } from './components/CommandPalette'
@@ -37,6 +38,7 @@ function App() {
           }}
           className="hidden min-w-64 items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-xs text-ink-faint transition hover:border-line hover:bg-raised md:flex"
         >
+          <Search aria-hidden className="size-3.5 shrink-0" />
           <span className="flex-1 text-left">Buscar request…</span>
           <kbd className="rounded border border-line bg-app px-1.5 py-px font-mono text-[10px]">
             Ctrl K

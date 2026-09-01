@@ -1,4 +1,5 @@
 import type { KeyValue } from '@somnolent/core'
+import { Plus, X } from 'lucide-react'
 import { TemplateInput } from './TemplateInput'
 
 interface Props {
@@ -65,16 +66,18 @@ export function KeyValueEditor({
             onClick={() => remove(it.id)}
             className="text-ink-faint opacity-0 transition group-hover:opacity-100 hover:text-bad"
             title="Remover"
+            aria-label="Remover"
           >
-            ✕
+            <X className="size-3.5" />
           </button>
         </div>
       ))}
       <button
         onClick={add}
-        className="w-fit rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
+        className="flex w-fit items-center gap-1 rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
       >
-        + adicionar
+        <Plus className="size-3.5" />
+        adicionar
       </button>
     </div>
   )

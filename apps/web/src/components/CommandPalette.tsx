@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowDown, ArrowUp, Search } from 'lucide-react'
 import { useStore } from '../store'
 import { MethodChip } from './MethodChip'
 
@@ -59,8 +60,10 @@ export function CommandPalette() {
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-lg overflow-hidden rounded-lg border border-line bg-panel shadow-2xl"
       >
-        <input
-          ref={inputRef}
+        <div className="flex items-center gap-2 border-b border-line px-4">
+          <Search aria-hidden className="size-4 shrink-0 text-ink-faint" />
+          <input
+            ref={inputRef}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -77,9 +80,10 @@ export function CommandPalette() {
             }
             if (e.key === 'Enter' && results[cursor]) pick(results[cursor].id)
           }}
-          placeholder="Buscar request por nome, URL ou método…"
-          className="w-full border-b border-line bg-transparent px-4 py-3 text-sm text-ink placeholder:text-ink-faint focus:outline-none"
-        />
+            placeholder="Buscar request por nome, URL ou método…"
+            className="w-full bg-transparent py-3 text-sm text-ink placeholder:text-ink-faint focus:outline-none"
+          />
+        </div>
         <div className="max-h-72 overflow-y-auto p-1">
           {results.length === 0 && (
             <p className="px-3 py-4 text-sm text-ink-faint">Nada encontrado.</p>
@@ -102,8 +106,10 @@ export function CommandPalette() {
             )
           })}
         </div>
-        <p className="border-t border-line px-4 py-2 text-[10px] text-ink-faint">
-          ↑↓ navega · Enter abre · Esc fecha
+        <p className="flex items-center gap-1 border-t border-line px-4 py-2 text-[10px] text-ink-faint">
+          <ArrowUp aria-hidden className="size-3" />
+          <ArrowDown aria-hidden className="size-3" />
+          navega · Enter abre · Esc fecha
         </p>
       </div>
     </div>

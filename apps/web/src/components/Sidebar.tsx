@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, Copy, FolderPlus, Import, Plus, X } from 'lucide-react'
 import type { ApiRequest, Collection } from '@somnolent/core'
 import { bySortOrder, useStore } from '../store'
 import { ImportModal } from './ImportModal'
@@ -97,8 +98,9 @@ function RequestRow({
           }}
           className="rounded px-1 text-ink-faint hover:text-ink"
           title="Duplicar request"
+          aria-label="Duplicar request"
         >
-          ⧉
+          <Copy className="size-3.5" />
         </button>
         <button
           onClick={(e) => {
@@ -107,8 +109,9 @@ function RequestRow({
           }}
           className="rounded px-1 text-ink-faint hover:text-bad"
           title="Excluir request"
+          aria-label="Excluir request"
         >
-          ✕
+          <X className="size-3.5" />
         </button>
       </span>
     </div>
@@ -190,13 +193,11 @@ function FolderHeader({
     >
       {here?.edge === 'before' && <span className={`${LINE} -top-px`} />}
       {here?.edge === 'after' && <span className={`${LINE} -bottom-px`} />}
-      <span
+      <ChevronDown
         aria-hidden
-        className="flex h-4 w-4 shrink-0 items-center justify-center text-sm text-ink-faint transition-transform"
+        className="size-4 shrink-0 text-ink-faint transition-transform"
         style={{ transform: collapsed ? 'rotate(-90deg)' : 'none' }}
-      >
-        ▾
-      </span>
+      />
       {editing ? (
         <input
           autoFocus
@@ -226,8 +227,9 @@ function FolderHeader({
           }}
           className="px-1 text-ink-faint hover:text-ink"
           title="Nova request nesta pasta"
+          aria-label="Nova request nesta pasta"
         >
-          +
+          <Plus className="size-3.5" />
         </button>
         {depth < 2 && (
           <button
@@ -237,8 +239,9 @@ function FolderHeader({
             }}
             className="px-1 text-ink-faint hover:text-ink"
             title="Nova subpasta"
+            aria-label="Nova subpasta"
           >
-            ⊕
+            <FolderPlus className="size-3.5" />
           </button>
         )}
         <button
@@ -249,8 +252,9 @@ function FolderHeader({
           }}
           className="px-1 text-ink-faint hover:text-bad"
           title="Excluir pasta"
+          aria-label="Excluir pasta"
         >
-          ✕
+          <X className="size-3.5" />
         </button>
       </span>
     </div>
@@ -386,23 +390,26 @@ export function Sidebar() {
         <div className="flex items-center gap-1">
           <button
             onClick={() => addRequest(null)}
-            className="flex-1 rounded-md bg-brand px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-hi"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-hi"
           >
+            <Plus className="size-3.5" />
             Nova request
           </button>
           <button
             onClick={() => addCollection('Nova pasta')}
             className="rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
             title="Nova pasta"
+            aria-label="Nova pasta"
           >
-            Pasta
+            <FolderPlus className="size-4" />
           </button>
           <button
             onClick={() => setImporting(true)}
             className="rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
             title="Importar do Insomnia ou de um comando curl"
+            aria-label="Importar do Insomnia ou de um comando curl"
           >
-            ⤓
+            <Import className="size-4" />
           </button>
         </div>
         <input

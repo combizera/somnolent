@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import { useStore, type HistoryEntry } from '../store'
@@ -82,10 +83,11 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
             {viewingEntry && (
               <button
                 onClick={() => setViewingId(null)}
-                className="ml-auto rounded bg-raised px-2 py-0.5 text-[11px] text-ink-dim transition hover:text-ink"
+                className="ml-auto flex items-center gap-1 rounded bg-raised px-2 py-0.5 text-[11px] text-ink-dim transition hover:text-ink"
                 title="Voltar para a response mais recente"
               >
-                vendo histórico ✕
+                vendo histórico
+                <X className="size-3" />
               </button>
             )}
           </>

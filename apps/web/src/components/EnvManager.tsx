@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Eye, EyeOff, Plus, Trash2, TriangleAlert, X } from 'lucide-react'
 import { duplicateEnvIds, duplicateVarIndexes } from '@somnolent/core'
 import type { Environment, EnvironmentVariable } from '@somnolent/core'
 import { useStore } from '../store'
@@ -71,10 +72,15 @@ function VariableRows({ env }: { env: Environment }) {
                     return next
                   })
                 }
-                className="shrink-0 px-1 text-[11px] text-ink-faint hover:text-ink"
+                className="shrink-0 px-1 text-ink-faint hover:text-ink"
                 title={revealed.has(i) ? 'Ocultar valor' : 'Mostrar valor'}
+                aria-label={revealed.has(i) ? 'Ocultar valor' : 'Mostrar valor'}
               >
-                {revealed.has(i) ? 'ocultar' : 'ver'}
+                {revealed.has(i) ? (
+                  <EyeOff className="size-3.5" />
+                ) : (
+                  <Eye className="size-3.5" />
+                )}
               </button>
             )}
           </div>
@@ -87,26 +93,28 @@ function VariableRows({ env }: { env: Environment }) {
           />
           <button
             onClick={() => setVars(env.variables.filter((_, j) => j !== i))}
-            className="text-ink-faint hover:text-bad"
+            className="mx-auto text-ink-faint hover:text-bad"
             title="Remover variável"
+            aria-label="Remover variável"
           >
-            ✕
+            <X className="size-3.5" />
           </button>
         </div>
       ))}
       {dupeIndexes.size > 0 && (
         <p className="px-1 py-0.5 text-[11px] text-bad">
           Chave repetida neste environment: no send só uma vale (a última). Renomeie ou remova a
-          repetida com o ✕.
+          repetida.
         </p>
       )}
       <button
         onClick={() =>
           setVars([...env.variables, { key: '', value: '', secret: false, enabled: true }])
         }
-        className="w-fit rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
+        className="flex w-fit items-center gap-1 rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
       >
-        + variável
+        <Plus className="size-3.5" />
+        variável
       </button>
     </div>
   )
@@ -157,8 +165,8 @@ export function EnvManager({ onClose }: { onClose: () => void }) {
                   {env.name}
                 </span>
                 {dupeEnvIds.has(env.id) && (
-                  <span className="ml-auto text-[11px] text-bad" title="Nome repetido">
-                    ⚠
+                  <span className="ml-auto flex shrink-0 items-center" title="Nome repetido">
+                    <TriangleAlert aria-label="Nome repetido" className="size-3.5 text-bad" />
                   </span>
                 )}
                 {env.isBase && <span className="ml-auto text-[10px] text-ink-faint">base</span>}
@@ -167,9 +175,10 @@ export function EnvManager({ onClose }: { onClose: () => void }) {
           </div>
           <button
             onClick={() => setSelectedId(addEnvironment())}
-            className="m-2 rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+            className="m-2 flex items-center justify-center gap-1 rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
           >
-            + environment
+            <Plus className="size-3.5" />
+            environment
           </button>
         </div>
 
@@ -214,8 +223,9 @@ export function EnvManager({ onClose }: { onClose: () => void }) {
                       setSelectedId(environments.find((e) => e.isBase)?.id ?? null)
                     }
                   }}
-                  className="ml-auto rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-bad/10 hover:text-bad"
+                  className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-bad/10 hover:text-bad"
                 >
+                  <Trash2 className="size-3.5" />
                   excluir
                 </button>
               </>
@@ -233,8 +243,9 @@ export function EnvManager({ onClose }: { onClose: () => void }) {
                 selected && !selected.isBase ? '' : 'ml-auto'
               }`}
               title="Fechar"
+              aria-label="Fechar"
             >
-              ✕
+              <X className="size-4" />
             </button>
           </header>
           <div className="flex-1 overflow-y-auto p-3">
