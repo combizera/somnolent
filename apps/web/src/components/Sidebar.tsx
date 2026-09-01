@@ -390,6 +390,11 @@ export function Sidebar() {
   const moveCollection = useStore((s) => s.moveCollection)
   const openCollectionId = useStore((s) => s.openCollectionId)
   const openProjectId = useStore((s) => s.openProjectId)
+  // Persistido: recarregar a página devolve as pastas como você deixou.
+  const expandedFolders = useStore((s) => s.expandedFolders)
+  const toggleFolder = useStore((s) => s.toggleFolder)
+  const expandFolders = useStore((s) => s.expandFolders)
+  const collapseFolders = useStore((s) => s.collapseFolders)
   const openCollection = useStore((s) => s.openCollection)
   const renameCollection = useStore((s) => s.renameCollection)
 
@@ -397,7 +402,6 @@ export function Sidebar() {
   const [renamingOpen, setRenamingOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const [filter, setFilter] = useState('')
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [drag, setDrag] = useState<DragItem | null>(null)
   const [spot, setSpot] = useState<DropSpot | null>(null)
 
@@ -505,13 +509,6 @@ export function Sidebar() {
     clear()
   }
 
-  const toggle = (id: string) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
 
   const dragProps = { enabled: dndEnabled, drag, setDrag, spot, setSpot, onDrop: handleDrop }
 
@@ -520,24 +517,27 @@ export function Sidebar() {
     ? [...subtreeOf(open.id)].filter((id) => id !== open.id)
     : []
   const allCollapsed =
-    foldersInside.length > 0 && foldersInside.every((id) => collapsed.has(id))
+    foldersInside.length > 0 && !foldersInside.some((id) => expandedFolders.includes(id))
   const toggleAll = () =>
-    setCollapsed(allCollapsed ? new Set() : new Set(foldersInside))
+    allCollapsed ? expandFolders(foldersInside) : collapseFolders(foldersInside)
 
   const renderFolder = (col: Collection) => {
     const items = inFolder(col.id)
     const childCols = sortedCollections.filter((c) => c.parentId === col.id)
-    const isCollapsed = collapsed.has(col.id) && !q
+    // Fechada por padrão: só abre o que está na lista de abertas (ou tudo,
+    // enquanto houver filtro — senão o resultado ficaria escondido).
+    const isCollapsed = !expandedFolders.includes(col.id) && !q
     if (q && items.length === 0 && childCols.length === 0) return null
     return (
       <div key={col.id} className="mb-1">
         <FolderHeader
           col={col}
           collapsed={isCollapsed}
-          onToggle={() => toggle(col.id)}
+          onToggle={() => toggleFolder(col.id)}
           onAddSub={() => {
             addSubCollection(col.id, 'Nova subpasta')
-            if (collapsed.has(col.id)) toggle(col.id)
+            // criar subpasta dentro de uma fechada esconderia o que acabou de nascer
+            expandFolders([col.id])
           }}
           editing={editingId === col.id}
           onStartEditing={() => setEditingId(col.id)}

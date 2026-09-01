@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App'
 import { useStore } from './store'
 
@@ -9,6 +9,12 @@ import { useStore } from './store'
  * cada chamada, que faz o React estourar "Maximum update depth exceeded".
  */
 
+/**
+ * O store é singleton de módulo, então um teste que apaga collections sujaria
+ * os seguintes. Guarda o estado inicial e devolve ele antes de cada caso.
+ */
+const initialState = useStore.getState()
+beforeEach(() => useStore.setState(initialState, true))
 afterEach(cleanup)
 
 describe('App', () => {
@@ -41,5 +47,48 @@ describe('App', () => {
 
     expect(() => render(<App />)).not.toThrow()
     expect(screen.getByText('Sem collection')).toBeDefined()
+  })
+})
+
+describe('pastas na sidebar', () => {
+  /** Monta uma pasta com uma request dentro, na collection do seed. */
+  function comPasta() {
+    const s = useStore.getState()
+    const collection = s.collections.find((c) => c.parentId === null)!
+    s.openCollection(collection.id)
+    s.addSubCollection(collection.id, 'Pasta de teste')
+    const folder = useStore.getState().collections.find((c) => c.name === 'Pasta de teste')!
+    const requestId = useStore.getState().addRequest(folder.id)
+    useStore.getState().updateRequest(requestId, { name: 'request escondida' })
+    // addSubCollection abre o pai; o teste quer o estado de partida limpo
+    useStore.getState().collapseFolders([folder.id])
+    return folder
+  }
+
+  /** O nome da pasta também aparece na trilha do painel; olhamos só a sidebar. */
+  const sidebar = () => within(screen.getByRole('complementary'))
+
+  it('nasce fechada: o conteúdo não aparece até abrirem', () => {
+    comPasta()
+    render(<App />)
+    expect(sidebar().getByText('Pasta de teste')).toBeDefined()
+    expect(sidebar().queryByText('request escondida')).toBeNull()
+  })
+
+  it('clicar abre e o que estava aberto fica registrado pra sobreviver ao reload', () => {
+    const folder = comPasta()
+    render(<App />)
+
+    fireEvent.click(sidebar().getByText('Pasta de teste'))
+
+    expect(sidebar().getByText('request escondida')).toBeDefined()
+    expect(useStore.getState().expandedFolders).toContain(folder.id)
+  })
+
+  it('apagar a pasta esquece que ela estava aberta', () => {
+    const folder = comPasta()
+    useStore.getState().expandFolders([folder.id])
+    useStore.getState().deleteCollection(folder.id)
+    expect(useStore.getState().expandedFolders).not.toContain(folder.id)
   })
 })

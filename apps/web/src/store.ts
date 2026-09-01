@@ -157,6 +157,13 @@ interface AppState {
    * É escolha local de quem navega: não sincroniza.
    */
   openCollectionId: string | null
+  /**
+   * Pastas que a pessoa deixou abertas. Guardamos as ABERTAS, não as fechadas:
+   * assim pasta nova — recém-criada ou recém-importada — nasce fechada, e
+   * recarregar a página devolve exatamente o que estava aberto.
+   * Array, não Set: o persist serializa em JSON e Set viraria `{}`.
+   */
+  expandedFolders: string[]
   history: Record<string, HistoryEntry[]>
 
   /**
@@ -189,6 +196,9 @@ interface AppState {
   addCollection: (name: string) => string
   /** Entra numa collection (ou volta pra lista, com null). */
   openCollection: (id: string | null) => void
+  toggleFolder: (id: string) => void
+  expandFolders: (ids: string[]) => void
+  collapseFolders: (ids: string[]) => void
   addSubCollection: (parentId: string, name: string) => void
   renameCollection: (id: string, name: string) => void
   deleteCollection: (id: string) => void
@@ -224,6 +234,7 @@ export const useStore = create<AppState>()(
     (set) => ({
       history: {},
       openCollectionId: null,
+      expandedFolders: [],
       ...seed(),
 
       connection: {
@@ -393,6 +404,19 @@ export const useStore = create<AppState>()(
 
       openProject: (id) => set({ openProjectId: id, openCollectionId: null }),
 
+      toggleFolder: (id) =>
+        set((s) => ({
+          expandedFolders: s.expandedFolders.includes(id)
+            ? s.expandedFolders.filter((it) => it !== id)
+            : [...s.expandedFolders, id],
+        })),
+
+      expandFolders: (ids) =>
+        set((s) => ({ expandedFolders: [...new Set([...s.expandedFolders, ...ids])] })),
+
+      collapseFolders: (ids) =>
+        set((s) => ({ expandedFolders: s.expandedFolders.filter((id) => !ids.includes(id)) })),
+
       addCollection: (name) => {
         const id = uid()
         set((s) => ({
@@ -468,6 +492,7 @@ export const useStore = create<AppState>()(
             openCollectionId: allColIds.has(s.openCollectionId ?? '')
               ? null
               : s.openCollectionId,
+            expandedFolders: s.expandedFolders.filter((id) => !allColIds.has(id)),
             pendingDeletes: {
               ...s.pendingDeletes,
               collections: [...s.pendingDeletes.collections, ...allColIds],
