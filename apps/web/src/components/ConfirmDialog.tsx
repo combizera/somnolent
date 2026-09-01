@@ -48,12 +48,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           >
             <div className="flex gap-3">
               {pending.danger && (
-                <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-bad/15">
-                  <TriangleAlert aria-hidden className="size-4 text-bad" />
+                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-bad/15">
+                  <TriangleAlert aria-hidden className="size-4.5 text-bad" />
                 </span>
               )}
               <div className="flex min-w-0 flex-col gap-1">
-                <h2 className="text-sm font-semibold text-ink">{pending.title}</h2>
+                <h2 className="text-lg leading-snug font-semibold text-balance text-ink">
+                  {pending.title}
+                </h2>
                 {pending.message && (
                   <p className="text-sm leading-relaxed text-ink-dim">{pending.message}</p>
                 )}
