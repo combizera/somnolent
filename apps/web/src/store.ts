@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { migrateWorkspace } from './lib/migrate'
@@ -794,10 +795,22 @@ export function useBaseEnv() {
   )
 }
 
-/** Environments da collection em contexto, na ordem escolhida. */
+const NO_ENVS: Environment[] = []
+
+/**
+ * Environments da collection em contexto.
+ *
+ * O filtro fica FORA do seletor de propósito: seletor que devolve array novo a
+ * cada chamada faz o zustand achar que o estado mudou e o React entra em loop
+ * ("getSnapshot should be cached"). Aqui o seletor devolve a referência crua e
+ * o recorte acontece num useMemo.
+ */
 export function useCollectionEnvs(collectionId: string | null): Environment[] {
-  return useStore((s) =>
-    collectionId ? s.environments.filter((e) => e.collectionId === collectionId) : [],
+  const environments = useStore((s) => s.environments)
+  return useMemo(
+    () =>
+      collectionId ? environments.filter((e) => e.collectionId === collectionId) : NO_ENVS,
+    [environments, collectionId],
   )
 }
 
