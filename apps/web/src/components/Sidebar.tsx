@@ -3,6 +3,8 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Copy,
   Folder,
   FolderOpen,
@@ -224,12 +226,12 @@ function FolderHeader({
             onStopEditing()
           }}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-          className="w-full cursor-text rounded bg-app px-1 text-xs text-ink focus:outline-none"
+          className="w-full cursor-text rounded bg-app px-1 text-sm text-ink focus:outline-none"
         />
       ) : (
         <span
           onDoubleClick={onStartEditing}
-          className="flex-1 truncate text-xs font-semibold text-ink-dim"
+          className="flex-1 truncate text-sm font-semibold text-ink-dim"
           title="Arraste para reordenar · duplo clique para renomear"
         >
           {col.name}
@@ -513,6 +515,15 @@ export function Sidebar() {
 
   const dragProps = { enabled: dndEnabled, drag, setDrag, spot, setSpot, onDrop: handleDrop }
 
+  // Pastas recolhíveis: tudo que pende da collection aberta, menos ela mesma.
+  const foldersInside = open
+    ? [...subtreeOf(open.id)].filter((id) => id !== open.id)
+    : []
+  const allCollapsed =
+    foldersInside.length > 0 && foldersInside.every((id) => collapsed.has(id))
+  const toggleAll = () =>
+    setCollapsed(allCollapsed ? new Set() : new Set(foldersInside))
+
   const renderFolder = (col: Collection) => {
     const items = inFolder(col.id)
     const childCols = sortedCollections.filter((c) => c.parentId === col.id)
@@ -540,7 +551,7 @@ export function Sidebar() {
               <RequestRow key={r.id} request={r} {...dragProps} />
             ))}
             {items.length === 0 && childCols.length === 0 && (
-              <p className="px-2 py-1 text-xs text-ink-faint">
+              <p className="px-2 py-1 text-sm text-ink-faint">
                 {drag?.kind === 'request' ? 'solte aqui' : 'vazia'}
               </p>
             )}
@@ -573,7 +584,7 @@ export function Sidebar() {
 
         {looseRequests.length > 0 && (
           <div className="mt-2 flex flex-col gap-0.5">
-            <p className="px-1 pt-1 pb-1 text-xs font-semibold text-ink-faint">
+            <p className="px-1 pt-1 pb-1 text-sm font-semibold text-ink-faint">
               Sem collection
             </p>
             {looseRequests.map((r) => (
@@ -583,7 +594,7 @@ export function Sidebar() {
         )}
 
         {shown.length === 0 && looseRequests.length === 0 && (
-          <p className="px-2 py-3 text-xs leading-relaxed text-ink-faint">
+          <p className="px-2 py-3 text-sm leading-relaxed text-ink-faint">
             {q
               ? 'Nada bate com o filtro.'
               : 'Crie uma collection ou importe um export do Insomnia.'}
@@ -604,7 +615,7 @@ export function Sidebar() {
 
         <div className="flex flex-col gap-0.5">
           {childCols.length > 0 && direct.length > 0 && (
-            <p className="px-1 pt-2 pb-1 text-xs font-semibold text-ink-faint">Sem pasta</p>
+            <p className="px-1 pt-2 pb-1 text-sm font-semibold text-ink-faint">Sem pasta</p>
           )}
           {direct.map((r) => (
             <RequestRow key={r.id} request={r} {...dragProps} />
@@ -613,7 +624,7 @@ export function Sidebar() {
 
         {drag?.kind === 'request' && (
           <div
-            className={`mt-2 rounded-md border border-dashed px-2 py-3 text-center text-xs transition ${
+            className={`mt-2 rounded-md border border-dashed px-2 py-3 text-center text-sm transition ${
               spot?.kind === 'root'
                 ? 'border-brand bg-brand/10 text-ink'
                 : 'border-line text-ink-faint'
@@ -624,7 +635,7 @@ export function Sidebar() {
         )}
 
         {childCols.length === 0 && direct.length === 0 && (
-          <p className="px-2 py-3 text-xs leading-relaxed text-ink-faint">
+          <p className="px-2 py-3 text-sm leading-relaxed text-ink-faint">
             {q ? 'Nenhuma request bate com o filtro.' : 'Collection vazia — crie a primeira request.'}
           </p>
         )}
@@ -674,14 +685,14 @@ export function Sidebar() {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => addRequest(open.id)}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-hi"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-hi"
               >
                 <Plus className="size-3.5" />
                 Nova request
               </button>
               <button
                 onClick={() => addSubCollection(open.id, 'Nova pasta')}
-                className="rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+                className="rounded-md border border-line px-2 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
                 title="Nova pasta nesta collection"
                 aria-label="Nova pasta nesta collection"
               >
@@ -689,7 +700,7 @@ export function Sidebar() {
               </button>
               <button
                 onClick={() => setImporting(true)}
-                className="rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+                className="rounded-md border border-line px-2 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
                 title="Importar do Insomnia ou de um comando curl"
                 aria-label="Importar do Insomnia ou de um comando curl"
               >
@@ -701,14 +712,14 @@ export function Sidebar() {
           <div className="flex items-center gap-1">
             <button
               onClick={() => openCollection(addCollection('Nova collection'))}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-hi"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-hi"
             >
               <Plus className="size-3.5" />
               Nova collection
             </button>
             <button
               onClick={() => setImporting(true)}
-              className="rounded-md border border-line px-2 py-1.5 text-xs text-ink-dim transition hover:bg-raised hover:text-ink"
+              className="rounded-md border border-line px-2 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
               title="Importar do Insomnia ou de um comando curl"
               aria-label="Importar do Insomnia ou de um comando curl"
             >
@@ -720,8 +731,22 @@ export function Sidebar() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder={open ? 'Filtrar requests' : 'Filtrar collections'}
-          className="w-full rounded-md border border-line bg-app px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
+          className="w-full rounded-md border border-line bg-app px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
         />
+        {foldersInside.length > 0 && (
+          <button
+            onClick={toggleAll}
+            className="flex w-fit items-center gap-1.5 rounded px-1 py-0.5 text-sm text-ink-faint transition hover:text-ink"
+            title={allCollapsed ? 'Abrir todas as pastas' : 'Fechar todas as pastas'}
+          >
+            {allCollapsed ? (
+              <ChevronsUpDown className="size-3.5" />
+            ) : (
+              <ChevronsDownUp className="size-3.5" />
+            )}
+            {allCollapsed ? 'Abrir todas' : 'Fechar todas'}
+          </button>
+        )}
       </div>
 
       {importing && <ImportModal onClose={() => setImporting(false)} />}
