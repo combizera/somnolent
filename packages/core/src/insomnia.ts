@@ -154,6 +154,7 @@ export function importInsomnia(
       name: "Base",
       isBase: true,
       variables: toVariables(r.data),
+      sortOrder: environments.length,
       version: 1,
       updatedAt: now(),
     });
@@ -167,6 +168,7 @@ export function importInsomnia(
       isBase: false,
       color: r.color ?? undefined,
       variables: toVariables(r.data),
+      sortOrder: environments.length,
       version: 1,
       updatedAt: now(),
     });

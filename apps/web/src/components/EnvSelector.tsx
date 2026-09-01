@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
-import { useActiveEnv, useStore } from '../store'
+import { bySortOrder, useActiveEnv, useStore } from '../store'
 import { EnvManager } from './EnvManager'
 
 export function EnvSelector() {
@@ -10,7 +10,8 @@ export function EnvSelector() {
   const active = useActiveEnv()
   const [managing, setManaging] = useState(false)
 
-  const switchable = environments.filter((e) => !e.isBase)
+  // mesma ordem que a pessoa arrastou no gerenciador
+  const switchable = environments.filter((e) => !e.isBase).sort(bySortOrder)
 
   return (
     <div className="flex items-stretch overflow-hidden rounded-md border border-line">

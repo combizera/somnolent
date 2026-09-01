@@ -78,6 +78,8 @@ export interface Environment {
   /** Cor de destaque da UI quando este ambiente está ativo (hex). */
   color?: string;
   variables: EnvironmentVariable[];
+  /** Ordem escolhida pela pessoa no gerenciador (o base também entra na ordem). */
+  sortOrder: number;
   version: number;
   updatedAt: string;
 }

@@ -23,6 +23,7 @@ function makeEnv(
       secret: false,
       enabled: true,
     })),
+    sortOrder: 0,
     version: 1,
     updatedAt: "2026-01-01T00:00:00Z",
   };

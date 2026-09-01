@@ -187,6 +187,7 @@ describe("toCurl + auth helper", () => {
     name: "stg",
     isBase: false,
     variables: [{ key: "token", value: "tok-123", secret: true, enabled: true }],
+    sortOrder: 0,
     version: 1,
     updatedAt: "2026-08-04T00:00:00.000Z",
   };

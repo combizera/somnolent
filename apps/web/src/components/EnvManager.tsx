@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Eye, EyeOff, Plus, Trash2, TriangleAlert, X } from 'lucide-react'
+import { Eye, EyeOff, GripVertical, Plus, Trash2, TriangleAlert, X } from 'lucide-react'
 import { duplicateEnvIds, duplicateVarIndexes } from '@somnolent/core'
 import type { Environment, EnvironmentVariable } from '@somnolent/core'
-import { useStore } from '../store'
+import { bySortOrder, useStore } from '../store'
 
 const SWATCHES = ['#efa14e', '#e0525f', '#58ad4c', '#4f97e8', '#7c5cff', '#e06fb4']
+
+const DROP_LINE = 'pointer-events-none absolute inset-x-1 h-0.5 rounded-full bg-brand'
 
 function VariableRows({ env }: { env: Environment }) {
   const updateEnvironment = useStore((s) => s.updateEnvironment)
@@ -125,13 +127,29 @@ export function EnvManager({ onClose }: { onClose: () => void }) {
   const addEnvironment = useStore((s) => s.addEnvironment)
   const updateEnvironment = useStore((s) => s.updateEnvironment)
   const deleteEnvironment = useStore((s) => s.deleteEnvironment)
+  const moveEnvironment = useStore((s) => s.moveEnvironment)
   const [selectedId, setSelectedId] = useState<string | null>(
     environments.find((e) => !e.isBase)?.id ?? environments[0]?.id ?? null,
   )
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dropAt, setDropAt] = useState<number | null>(null)
 
   const selected = environments.find((e) => e.id === selectedId) ?? null
   const dupeEnvIds = duplicateEnvIds(environments)
-  const sorted = [...environments].sort((a, b) => Number(b.isBase) - Number(a.isBase))
+  // A ordem é a que a pessoa arrastou; o base não fica mais preso no topo.
+  const sorted = [...environments].sort(bySortOrder)
+
+  /** Índice do slot vira índice na lista sem o item arrastado. */
+  const commitDrop = (slot: number) => {
+    if (dragId) {
+      const from = sorted.findIndex((e) => e.id === dragId)
+      if (from >= 0 && slot !== from && slot !== from + 1) {
+        moveEnvironment(dragId, slot > from ? slot - 1 : slot)
+      }
+    }
+    setDragId(null)
+    setDropAt(null)
+  }
 
   return (
     <div
@@ -140,21 +158,69 @@ export function EnvManager({ onClose }: { onClose: () => void }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[560px] w-full max-w-3xl overflow-hidden rounded-lg border border-line bg-panel shadow-2xl"
+        className="flex h-[620px] w-full max-w-5xl overflow-hidden rounded-lg border border-line bg-panel shadow-2xl"
       >
-        <div className="flex w-52 shrink-0 flex-col border-r border-line bg-app">
-          <p className="px-3 pt-3 pb-1 text-[10px] font-semibold tracking-wider text-ink-faint uppercase">
+        <div className="flex w-60 shrink-0 flex-col border-r border-line bg-app">
+          <p
+            className="px-3 pt-3 pb-1 text-[10px] font-semibold tracking-wider text-ink-faint uppercase"
+            title="Arraste para reordenar"
+          >
             Environments
           </p>
-          <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
-            {sorted.map((env) => (
-              <button
+          <div
+            className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2"
+            onDragOver={(e) => {
+              // Soltar no espaço vazio embaixo joga pro fim da lista.
+              if (!dragId) return
+              e.preventDefault()
+              if (dropAt !== sorted.length) setDropAt(sorted.length)
+            }}
+            onDrop={(e) => {
+              if (!dragId) return
+              e.preventDefault()
+              commitDrop(sorted.length)
+            }}
+          >
+            {sorted.map((env, i) => (
+              <div
                 key={env.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = 'move'
+                  e.dataTransfer.setData('text/plain', env.id)
+                  setDragId(env.id)
+                }}
+                onDragEnd={() => {
+                  setDragId(null)
+                  setDropAt(null)
+                }}
+                onDragOver={(e) => {
+                  if (!dragId) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  e.dataTransfer.dropEffect = 'move'
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const next = e.clientY < rect.top + rect.height / 2 ? i : i + 1
+                  if (dropAt !== next) setDropAt(next)
+                }}
+                onDrop={(e) => {
+                  if (!dragId) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  commitDrop(e.clientY < rect.top + rect.height / 2 ? i : i + 1)
+                }}
                 onClick={() => setSelectedId(env.id)}
-                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition ${
+                className={`group relative flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition ${
                   env.id === selectedId ? 'bg-hover text-ink' : 'text-ink-dim hover:bg-raised'
-                }`}
+                } ${dragId === env.id ? 'opacity-40' : ''}`}
               >
+                {dropAt === i && <span className={`${DROP_LINE} -top-px`} />}
+                {dropAt === i + 1 && <span className={`${DROP_LINE} -bottom-px`} />}
+                <GripVertical
+                  aria-hidden
+                  className="size-3 shrink-0 text-ink-faint opacity-0 transition group-hover:opacity-100"
+                />
                 <span
                   className="size-2 shrink-0 rounded-full"
                   style={{
@@ -169,8 +235,15 @@ export function EnvManager({ onClose }: { onClose: () => void }) {
                     <TriangleAlert aria-label="Nome repetido" className="size-3.5 text-bad" />
                   </span>
                 )}
-                {env.isBase && <span className="ml-auto text-[10px] text-ink-faint">base</span>}
-              </button>
+                {env.isBase && (
+                  <span
+                    className="ml-auto shrink-0 text-[10px] text-ink-faint"
+                    title="Environment base: aplicado antes do ativo, em todos os outros"
+                  >
+                    base
+                  </span>
+                )}
+              </div>
             ))}
           </div>
           <button
@@ -184,13 +257,13 @@ export function EnvManager({ onClose }: { onClose: () => void }) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex items-center gap-3 border-b border-line px-3 py-2.5">
-            {selected && !selected.isBase ? (
+            {selected ? (
               <>
                 <input
                   value={selected.name}
                   spellCheck={false}
                   onChange={(e) => updateEnvironment(selected.id, { name: e.target.value })}
-                  className={`rounded-md border bg-app px-2 py-1 text-sm font-medium text-ink focus:outline-none ${
+                  className={`w-48 rounded-md border bg-app px-2 py-1 text-sm font-medium text-ink focus:outline-none ${
                     dupeEnvIds.has(selected.id)
                       ? 'border-bad focus:border-bad'
                       : 'border-line focus:border-brand'
@@ -201,45 +274,54 @@ export function EnvManager({ onClose }: { onClose: () => void }) {
                     Já existe um environment com este nome.
                   </span>
                 )}
-                <div className="flex items-center gap-1.5">
-                  {SWATCHES.map((c) => (
+
+                {selected.isBase ? (
+                  // O base nunca é o ativo, então não tem cor de destaque nem exclusão.
+                  <p className="min-w-0 flex-1 text-xs leading-relaxed text-ink-faint">
+                    <span className="mr-1.5 rounded bg-raised px-1.5 py-0.5 text-[10px] text-ink-dim">
+                      base
+                    </span>
+                    Variáveis comuns a todos os environments — cada um pode sobrescrevê-las. O nome
+                    é só rótulo: este environment não aparece no seletor do topo.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1.5">
+                      {SWATCHES.map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => updateEnvironment(selected.id, { color: c })}
+                          className={`size-4 rounded-full transition ${
+                            selected.color === c
+                              ? 'ring-2 ring-ink ring-offset-2 ring-offset-panel'
+                              : 'opacity-50 hover:opacity-100'
+                          }`}
+                          style={{ background: c }}
+                          title="Cor do environment"
+                        />
+                      ))}
+                    </div>
                     <button
-                      key={c}
-                      onClick={() => updateEnvironment(selected.id, { color: c })}
-                      className={`size-4 rounded-full transition ${
-                        selected.color === c
-                          ? 'ring-2 ring-ink ring-offset-2 ring-offset-panel'
-                          : 'opacity-50 hover:opacity-100'
-                      }`}
-                      style={{ background: c }}
-                      title="Cor do environment"
-                    />
-                  ))}
-                </div>
-                <button
-                  onClick={() => {
-                    if (confirm(`Excluir o environment "${selected.name}"?`)) {
-                      deleteEnvironment(selected.id)
-                      setSelectedId(environments.find((e) => e.isBase)?.id ?? null)
-                    }
-                  }}
-                  className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-bad/10 hover:text-bad"
-                >
-                  <Trash2 className="size-3.5" />
-                  excluir
-                </button>
+                      onClick={() => {
+                        if (confirm(`Excluir o environment "${selected.name}"?`)) {
+                          deleteEnvironment(selected.id)
+                          setSelectedId(environments.find((e) => e.isBase)?.id ?? null)
+                        }
+                      }}
+                      className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-bad/10 hover:text-bad"
+                    >
+                      <Trash2 className="size-3.5" />
+                      excluir
+                    </button>
+                  </>
+                )}
               </>
             ) : (
-              <div>
-                <p className="text-sm font-medium text-ink">Base</p>
-                <p className="text-xs text-ink-faint">
-                  Variáveis comuns a todos os environments. Cada environment pode sobrescrevê-las.
-                </p>
-              </div>
+              <p className="text-sm text-ink-faint">Selecione um environment.</p>
             )}
             <button
               onClick={onClose}
-              className={`rounded px-2 py-1 text-ink-faint transition hover:bg-raised hover:text-ink ${
+              className={`shrink-0 rounded px-2 py-1 text-ink-faint transition hover:bg-raised hover:text-ink ${
                 selected && !selected.isBase ? '' : 'ml-auto'
               }`}
               title="Fechar"

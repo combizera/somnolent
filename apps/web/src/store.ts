@@ -41,6 +41,7 @@ function seed() {
     name: 'Base',
     isBase: true,
     variables: [{ key: 'page_size', value: '20', secret: false, enabled: true }],
+    sortOrder: 0,
     version: 1,
     updatedAt: now(),
   }
@@ -54,6 +55,7 @@ function seed() {
       { key: 'base_url', value: 'https://httpbin.org', secret: false, enabled: true },
       { key: 'token', value: 'stg-token-123', secret: true, enabled: true },
     ],
+    sortOrder: 1,
     version: 1,
     updatedAt: now(),
   }
@@ -67,6 +69,7 @@ function seed() {
       { key: 'base_url', value: 'https://httpbin.org', secret: false, enabled: true },
       { key: 'token', value: 'prd-token-789', secret: true, enabled: true },
     ],
+    sortOrder: 2,
     version: 1,
     updatedAt: now(),
   }
@@ -154,6 +157,8 @@ interface AppState {
   }) => void
 
   addEnvironment: () => string
+  /** Reordena os environments na lista do gerenciador (o base também entra). */
+  moveEnvironment: (id: string, index: number) => void
   updateEnvironment: (id: string, patch: Partial<Environment>) => void
   deleteEnvironment: (id: string) => void
   setActiveEnv: (id: string | null) => void
@@ -500,11 +505,16 @@ export const useStore = create<AppState>()(
                 sortOrder: r.sortOrder + reqOffset,
               })),
             ],
-            // Env importado com nome já usado entra como "staging 2", não como duplicata.
+            // Env importado com nome já usado entra como "staging 2", não como
+            // duplicata; e a ordem dele começa depois da dos locais.
             environments: rest.reduce(
               (acc, env) => [
                 ...acc,
-                { ...env, name: uniqueEnvName(env.name, acc.map((e) => e.name)) },
+                {
+                  ...env,
+                  name: uniqueEnvName(env.name, acc.map((e) => e.name)),
+                  sortOrder: nextSort(acc),
+                },
               ],
               environments,
             ),
@@ -527,6 +537,7 @@ export const useStore = create<AppState>()(
               isBase: false,
               color: '#8b5cf6',
               variables: [],
+              sortOrder: nextSort(s.environments),
               version: 1,
               updatedAt: now(),
             },
@@ -554,6 +565,25 @@ export const useStore = create<AppState>()(
 
       setActiveEnv: (id) => set({ activeEnvId: id }),
 
+      moveEnvironment: (id, index) =>
+        set((s) => {
+          const moved = s.environments.find((e) => e.id === id)
+          if (!moved) return s
+
+          const others = s.environments.filter((e) => e.id !== id).sort(bySortOrder)
+          const clamped = Math.max(0, Math.min(index, others.length))
+          const ordered = [...others.slice(0, clamped), moved, ...others.slice(clamped)]
+          const position = new Map(ordered.map((e, i) => [e.id, i]))
+
+          return {
+            environments: s.environments.map((e) => {
+              const i = position.get(e.id)
+              if (i === undefined || e.sortOrder === i) return e
+              return { ...e, sortOrder: i, version: e.version + 1, updatedAt: now() }
+            }),
+          }
+        }),
+
       pushHistory: (entry) =>
         set((s) => {
           const list = s.history[entry.requestId] ?? []
@@ -577,7 +607,26 @@ export const useStore = create<AppState>()(
           return { history: rest }
         }),
     }),
-    { name: 'somnolent-workspace' },
+    {
+      name: 'somnolent-workspace',
+      version: 1,
+      /**
+       * v0 → v1: `Environment.sortOrder` não existia e a ordem era a de
+       * inserção. Congela essa ordem em números pra quem já tinha workspace
+       * salvo — sem isso o sort compara `undefined` e a lista embaralha.
+       */
+      migrate: (persisted, version) => {
+        const state = persisted as { environments?: Environment[] } | undefined
+        if (!state || version >= 1) return state as never
+        return {
+          ...state,
+          environments: (state.environments ?? []).map((env, i) => ({
+            ...env,
+            sortOrder: typeof env.sortOrder === 'number' ? env.sortOrder : i,
+          })),
+        } as never
+      },
+    },
   ),
 )
 

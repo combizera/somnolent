@@ -240,6 +240,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
       name: "Base",
       isBase: true,
       variables: toVariables(root.data),
+      sortOrder: 0,
       version: 1,
       updatedAt: now(),
     });
@@ -251,6 +252,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
         isBase: false,
         color: sub.color ?? undefined,
         variables: toVariables(sub.data),
+        sortOrder: environments.length,
         version: 1,
         updatedAt: now(),
       });

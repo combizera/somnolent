@@ -14,6 +14,7 @@ function makeEnv(id: string, name: string): Environment {
     name,
     isBase: false,
     variables: [],
+    sortOrder: 0,
     version: 1,
     updatedAt: "2026-01-01T00:00:00.000Z",
   };

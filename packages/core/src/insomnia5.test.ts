@@ -134,6 +134,16 @@ describe("importInsomniaExport — arquivo real do Insomnia v5", () => {
     expect(prod!.color).toBe("#e10505");
   });
 
+  it("numera a ordem dos environments a partir do base", () => {
+    const base = result.environments.find((e) => e.isBase)!;
+    expect(base.sortOrder).toBe(0);
+    expect(
+      result.environments.filter((e) => !e.isBase).map((e) => e.sortOrder),
+    ).toEqual(
+      result.environments.filter((e) => !e.isBase).map((_, i) => i + 1),
+    );
+  });
+
   it("marca credenciais como secretas e deixa base_url normal", () => {
     const base = result.environments.find((e) => e.isBase)!;
     expect(base.variables.find((v) => v.key === "base_url")).toMatchObject({
