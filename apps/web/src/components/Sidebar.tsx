@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
+import { subtreeIds } from '@somnolent/core'
 import type { ApiRequest, Collection } from '@somnolent/core'
 import { bySortOrder, useStore } from '../store'
 import { useConfirm } from '../lib/confirm'
@@ -436,17 +437,6 @@ export function Sidebar() {
   const open = sortedCollections.find((c) => c.id === openCollectionId) ?? null
   const rootCollections = sortedCollections.filter((c) => c.parentId === null)
 
-  /** Ids da collection e de todas as descendentes. */
-  const subtreeOf = (rootId: string): Set<string> => {
-    const ids = new Set<string>()
-    const queue = [rootId]
-    while (queue.length > 0) {
-      const cur = queue.shift()!
-      ids.add(cur)
-      for (const c of sortedCollections) if (c.parentId === cur) queue.push(c.id)
-    }
-    return ids
-  }
 
   const countsByCollection = useMemo(() => {
     const parentOf = new Map(collections.map((c) => [c.id, c.parentId]))
@@ -525,7 +515,7 @@ export function Sidebar() {
 
   // Pastas recolhíveis: tudo que pende da collection aberta, menos ela mesma.
   const foldersInside = open
-    ? [...subtreeOf(open.id)].filter((id) => id !== open.id)
+    ? [...subtreeIds(sortedCollections, open.id)].filter((id) => id !== open.id)
     : []
   const allCollapsed =
     foldersInside.length > 0 && !foldersInside.some((id) => expandedFolders.includes(id))
@@ -595,7 +585,7 @@ export function Sidebar() {
       ? rootCollections.filter(
           (c) =>
             c.name.toLowerCase().includes(q) ||
-            [...subtreeOf(c.id)].some((id) => inFolder(id).length > 0),
+            [...subtreeIds(sortedCollections, c.id)].some((id) => inFolder(id).length > 0),
         )
       : rootCollections
 
