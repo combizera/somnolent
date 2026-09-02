@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { migrateWorkspace } from './lib/migrate'
-import { rootCollectionOf, uniqueEnvName } from '@somnolent/core'
+import { collectionIdsOfProject, rootCollectionOf, uniqueEnvName } from '@somnolent/core'
 import type {
   ApiRequest,
   Collection,
@@ -127,6 +127,37 @@ function seed() {
   }
 }
 
+export interface Connection {
+  key: string | null
+  scope: 'project' | 'collection' | null
+  role: 'write' | 'read' | null
+  label: string | null
+  /** Id do project NO SERVIDOR — e também do project local, depois de amarrado. */
+  projectId: string | null
+  projectName: string | null
+  collectionId: string | null
+}
+
+/**
+ * Grava a conexão no keyring. Toda action que mexe em `connection` passa por
+ * aqui: sem isso o keyring fica dessincronizado e trocar de project descarta
+ * uma chave viva.
+ */
+const remember = (keyring: Record<string, Connection>, connection: Connection) =>
+  connection.key && connection.projectId
+    ? { ...keyring, [connection.projectId]: connection }
+    : keyring
+
+const NO_CONNECTION: Connection = {
+  key: null,
+  scope: null,
+  role: null,
+  label: null,
+  projectId: null,
+  projectName: null,
+  collectionId: null,
+}
+
 export interface RemoteChanges {
   collections?: Collection[]
   requests?: ApiRequest[]
@@ -170,22 +201,36 @@ interface AppState {
    * Conexão de sync. Não há conta: a chave é a credencial e o que ela abre
    * (project inteiro ou uma collection) vem do servidor em /me.
    */
-  connection: {
-    key: string | null
-    scope: 'project' | 'collection' | null
-    role: 'write' | 'read' | null
-    label: string | null
-    projectName: string | null
-    collectionId: string | null
-  }
+  connection: Connection
+  /**
+   * Chave de cada project que esta máquina já abriu. É o que faz compartilhar
+   * ser uma ação repetível em vez de um momento único: ninguém precisa ter
+   * anotado a chave, e trocar de project no header reconecta sozinho.
+   */
+  keyring: Record<string, Connection>
   lastSyncAt: string | null
   pendingDeletes: PendingDeletes
 
-  connect: (key: string, info: Omit<AppState['connection'], 'key'>) => void
+  connect: (key: string, info: Omit<Connection, 'key'>) => void
   disconnect: () => void
   setLastSyncAt: (at: string) => void
   clearPendingDeletes: (pushed: PendingDeletes) => void
-  replaceAllData: () => void
+  /**
+   * Amarra o project local ao project do servidor: o id local passa a ser o do
+   * servidor. Sem isto as entidades sobem com um `projectId` que só existe
+   * nesta máquina, e quem entra depois puxa tudo pra um project que não tem —
+   * a sidebar filtra por `projectId` e a tela fica vazia.
+   * Usado ao criar um project (o project aberto vira o compartilhado) e ao
+   * reconectar uma conexão salva antes de o `projectId` existir.
+   */
+  adoptRemoteProject: (project: { id: string; name: string }) => void
+  /**
+   * Entra no project de outra pessoa: cria o project local com o id do
+   * servidor e limpa só o que houver dentro dele — o primeiro pull traz tudo.
+   * Os outros projects locais ficam intactos: agora só o project conectado
+   * sincroniza.
+   */
+  enterRemoteProject: (project: { id: string; name: string }) => void
   applyRemote: (changes: RemoteChanges, deletes: Partial<PendingDeletes>) => void
 
   addProject: (name: string) => string
@@ -237,30 +282,24 @@ export const useStore = create<AppState>()(
       expandedFolders: [],
       ...seed(),
 
-      connection: {
-        key: null,
-        scope: null,
-        role: null,
-        label: null,
-        projectName: null,
-        collectionId: null,
-      },
+      connection: NO_CONNECTION,
+      keyring: {},
       lastSyncAt: null,
       pendingDeletes: { collections: [], requests: [], environments: [] },
 
-      connect: (key, info) => set({ connection: { key, ...info }, lastSyncAt: null }),
+      connect: (key, info) =>
+        set((s) => {
+          const connection: Connection = { key, ...info }
+          return { connection, keyring: remember(s.keyring, connection), lastSyncAt: null }
+        }),
 
+      // "Desconectar esta máquina" tem que esquecer a chave também — senão
+      // trocar de project e voltar reconectaria sozinho.
       disconnect: () =>
-        set({
-          connection: {
-            key: null,
-            scope: null,
-            role: null,
-            label: null,
-            projectName: null,
-            collectionId: null,
-          },
-          lastSyncAt: null,
+        set((s) => {
+          const keyring = { ...s.keyring }
+          if (s.connection.projectId) delete keyring[s.connection.projectId]
+          return { connection: NO_CONNECTION, keyring, lastSyncAt: null }
         }),
 
       setLastSyncAt: (at) => set({ lastSyncAt: at }),
@@ -278,18 +317,84 @@ export const useStore = create<AppState>()(
           },
         })),
 
-      // Ao entrar num workspace de outra pessoa: zera o conteúdo local
-      // (o primeiro sync puxa tudo do servidor).
-      replaceAllData: () =>
-        set({
-          collections: [],
-          requests: [],
-          environments: [],
-          activeEnvByCollection: {},
-          selectedRequestId: null,
-          openCollectionId: null,
-          history: {},
-          pendingDeletes: { collections: [], requests: [], environments: [] },
+      adoptRemoteProject: ({ id, name }) =>
+        set((s) => {
+          const at = now()
+          const from = s.openProjectId
+          const connection = { ...s.connection, projectId: id, projectName: name }
+          // Este caminho também roda pela reconexão legada, que não passa por
+          // `connect` — sem gravar aqui, a chave viva se perderia na troca.
+          const keyring = remember(s.keyring, connection)
+          if (!from || from === id) {
+            // Já amarrado, ou não havia project aberto: só garante que ele
+            // existe na lista com o nome do servidor.
+            return {
+              connection,
+              keyring,
+              openProjectId: id,
+              projects: s.projects.some((p) => p.id === id)
+                ? s.projects.map((p) =>
+                    p.id === id ? { ...p, name, version: p.version + 1, updatedAt: at } : p,
+                  )
+                : [
+                    ...s.projects,
+                    { id, name, sortOrder: nextSort(s.projects), version: 1, updatedAt: at },
+                  ],
+            }
+          }
+          // `updatedAt` novo em tudo que foi re-etiquetado: o push manda só o
+          // que mudou depois do último sync, e aqui o `projectId` mudou.
+          return {
+            connection,
+            keyring,
+            openProjectId: id,
+            projects: s.projects.map((p) =>
+              p.id === from ? { ...p, id, name, version: p.version + 1, updatedAt: at } : p,
+            ),
+            collections: s.collections.map((c) =>
+              c.projectId === from
+                ? { ...c, projectId: id, version: c.version + 1, updatedAt: at }
+                : c,
+            ),
+            requests: s.requests.map((r) =>
+              r.projectId === from
+                ? { ...r, projectId: id, version: r.version + 1, updatedAt: at }
+                : r,
+            ),
+          }
+        }),
+
+      enterRemoteProject: ({ id, name }) =>
+        set((s) => {
+          const mine = collectionIdsOfProject(s.collections, id)
+          const requests = s.requests.filter((r) => r.projectId !== id)
+          const kept = new Set(requests.map((r) => r.id))
+          const connection = { ...s.connection, projectId: id, projectName: name }
+          return {
+            connection,
+            keyring: remember(s.keyring, connection),
+            openProjectId: id,
+            projects: s.projects.some((p) => p.id === id)
+              ? s.projects.map((p) => (p.id === id ? { ...p, name } : p))
+              : [
+                  ...s.projects,
+                  { id, name, sortOrder: nextSort(s.projects), version: 1, updatedAt: now() },
+                ],
+            // Limpa só o project conectado — os outros projects locais desta
+            // máquina não sincronizam e não têm por que ser apagados.
+            collections: s.collections.filter((c) => c.projectId !== id),
+            requests,
+            environments: s.environments.filter((e) => !mine.has(e.collectionId)),
+            activeEnvByCollection: Object.fromEntries(
+              Object.entries(s.activeEnvByCollection).filter(([colId]) => !mine.has(colId)),
+            ),
+            history: Object.fromEntries(
+              Object.entries(s.history).filter(([reqId]) => kept.has(reqId)),
+            ),
+            selectedRequestId: null,
+            openCollectionId: null,
+            pendingDeletes: { collections: [], requests: [], environments: [] },
+          }
         }),
 
       applyRemote: (changes, deletes) =>
@@ -334,11 +439,20 @@ export const useStore = create<AppState>()(
             }),
           })
 
-          const requests = merge(s.requests, changes.requests, deletes.requests)
+          // Tudo que chega pertence ao project conectado. Re-etiquetar defende
+          // contra linhas gravadas por um cliente antigo, que subia o
+          // `projectId` local dele: sem isto a sidebar filtra e não mostra nada.
+          const projectId = s.connection.projectId
+          const tag = <T extends { projectId: string }>(items: T[] | undefined) =>
+            projectId
+              ? items?.map((it) => (it.projectId === projectId ? it : { ...it, projectId }))
+              : items
+
+          const requests = merge(s.requests, tag(changes.requests), deletes.requests)
           const environments = merge(s.environments, changes.environments, deletes.environments, mergeEnv)
 
           return {
-            collections: merge(s.collections, changes.collections, deletes.collections),
+            collections: merge(s.collections, tag(changes.collections), deletes.collections),
             requests,
             environments,
             selectedRequestId: requests.some((r) => r.id === s.selectedRequestId)
@@ -384,12 +498,23 @@ export const useStore = create<AppState>()(
             .filter((e) => colIds.has(e.collectionId))
             .map((e) => e.id)
           const projects = s.projects.filter((p) => p.id !== id)
+          const keyring = { ...s.keyring }
+          delete keyring[id]
+          const nextOpen = s.openProjectId === id ? (projects[0]?.id ?? null) : s.openProjectId
+          // Apagou o project conectado: a conexão passa a ser a do project que
+          // ficou aberto, ou nenhuma.
+          const nextConnection = (nextOpen && keyring[nextOpen]) || NO_CONNECTION
           return {
             projects,
+            keyring,
+            connection: nextConnection,
+            // `lastSyncAt` é por conexão: trocou de conexão, o próximo sync
+            // tem que ser completo.
+            lastSyncAt: nextConnection.key === s.connection.key ? s.lastSyncAt : null,
             collections: s.collections.filter((c) => !colIds.has(c.id)),
             requests: s.requests.filter((r) => !reqIds.includes(r.id)),
             environments: s.environments.filter((e) => !envIds.includes(e.id)),
-            openProjectId: s.openProjectId === id ? (projects[0]?.id ?? null) : s.openProjectId,
+            openProjectId: nextOpen,
             openCollectionId: colIds.has(s.openCollectionId ?? '') ? null : s.openCollectionId,
             selectedRequestId: reqIds.includes(s.selectedRequestId ?? '')
               ? null
@@ -402,7 +527,23 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      openProject: (id) => set({ openProjectId: id, openCollectionId: null }),
+      // Trocar de project troca a conexão: o MVP sincroniza um project por
+      // máquina, e a chave de cada um está no keyring.
+      openProject: (id) =>
+        set((s) => {
+          const saved = s.keyring[id] ?? NO_CONNECTION
+          if (saved.key === s.connection.key) {
+            return { openProjectId: id, openCollectionId: null }
+          }
+          return {
+            openProjectId: id,
+            openCollectionId: null,
+            connection: saved,
+            // `lastSyncAt` é por conexão: mantê-lo faria o pull do project novo
+            // pedir só o que mudou depois de um sync que foi de outro project.
+            lastSyncAt: null,
+          }
+        }),
 
       toggleFolder: (id) =>
         set((s) => ({

@@ -60,7 +60,7 @@ function VariableRows({ env }: { env: Environment }) {
             <input
               value={v.value}
               type={v.secret && !revealed.has(i) ? 'password' : 'text'}
-              placeholder="valor"
+              placeholder="Valor"
               spellCheck={false}
               onChange={(e) => update(i, { value: e.target.value })}
               className="w-full rounded bg-transparent px-2 py-1 font-mono text-sm text-ink placeholder:text-ink-faint focus:outline-none"

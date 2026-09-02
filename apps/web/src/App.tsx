@@ -1,19 +1,22 @@
 import { Logo } from './components/Logo'
 import { EmptyState } from './components/EmptyState'
 import { Sidebar } from './components/Sidebar'
-import { Search } from 'lucide-react'
+import { Search, Share2 } from 'lucide-react'
 import { EnvSelector } from './components/EnvSelector'
 import { ProjectSelector } from './components/ProjectSelector'
 import { SyncPanel } from './components/SyncPanel'
+import { ShareDialog } from './components/ShareDialog'
 import { CommandPalette } from './components/CommandPalette'
 import { ConfirmProvider } from './components/ConfirmDialog'
 import { RequestPanel } from './components/RequestPanel'
 import { ResponsePanel } from './components/ResponsePanel'
 import { useActiveEnv, useSelectedRequest } from './store'
+import { useSession } from './sessionStore'
 
 function App() {
   const active = useActiveEnv()
   const request = useSelectedRequest()
+  const openShare = useSession((s) => s.openShare)
   // Cor do environment: sinal de contexto, não cor de interface.
   const envColor = active?.color ?? 'transparent'
 
@@ -49,12 +52,21 @@ function App() {
 
           <div className="flex items-center gap-2">
             <ProjectSelector />
+            <button
+              onClick={() => openShare()}
+              className="flex items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
+              title="Compartilhar este project"
+            >
+              <Share2 aria-hidden className="size-3.5" />
+              Compartilhar
+            </button>
             <SyncPanel />
             <EnvSelector />
           </div>
         </header>
 
         <CommandPalette />
+        <ShareDialog />
 
         <main className="grid min-h-0 flex-1 grid-cols-[272px_minmax(0,1fr)_minmax(0,1fr)]">
           <Sidebar />

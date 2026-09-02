@@ -223,8 +223,8 @@ describe('arrastar request', () => {
 
     const linha = sidebar.getByText(request.name)
     fireEvent.dragStart(linha, { dataTransfer: dt() })
-    // "solte aqui" só existe durante o arraste — por isso vem depois do dragStart
-    const corpo = sidebar.getByText('solte aqui').parentElement!
+    // "Solte aqui" só existe durante o arraste — por isso vem depois do dragStart
+    const corpo = sidebar.getByText('Solte aqui').parentElement!
     fireEvent.dragOver(corpo, { dataTransfer: dt() })
     fireEvent.drop(corpo, { dataTransfer: dt() })
 

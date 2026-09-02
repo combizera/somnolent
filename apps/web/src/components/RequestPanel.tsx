@@ -120,7 +120,7 @@ function PathParams({
               value={valueOf(name)}
               onChange={(value) => setValue(name, value)}
               ctx={ctx}
-              placeholder="valor que entra na URL"
+              placeholder="Valor que entra na URL"
             />
           </div>
         )
@@ -474,7 +474,7 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
               items={request.queryParams}
               onChange={(queryParams) => updateRequest(request.id, { queryParams })}
               ctx={ctx}
-              keyPlaceholder="query param"
+              keyPlaceholder="Query param"
             />
           </div>
         )}

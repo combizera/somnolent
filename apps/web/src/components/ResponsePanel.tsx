@@ -69,7 +69,7 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
     <section className="flex h-full min-w-0 flex-col border-l border-line bg-panel">
       {/* barra de status */}
       <header className="flex h-9 shrink-0 items-center gap-2 border-b border-line px-3 text-sm">
-        {sending && <span className="animate-pulse text-ink-dim">enviando…</span>}
+        {sending && <span className="animate-pulse text-ink-dim">Enviando…</span>}
         {!sending && view && (
           <>
             <span
@@ -89,7 +89,7 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
                 className="ml-auto flex items-center gap-1 rounded bg-raised px-2 py-0.5 text-xs text-ink-dim transition hover:text-ink"
                 title="Voltar para a response mais recente"
               >
-                vendo histórico
+                Vendo histórico
                 <X className="size-3" />
               </button>
             )}
@@ -97,11 +97,11 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
         )}
         {!sending && !view && response && !response.ok && (
           <span className="rounded bg-bad/20 px-2 py-0.5 font-mono text-xs font-bold text-bad">
-            falhou
+            Falhou
           </span>
         )}
         {!sending && !view && (!response || response.ok) && (
-          <span className="text-ink-faint">sem response ainda</span>
+          <span className="text-ink-faint">Sem response ainda</span>
         )}
       </header>
 

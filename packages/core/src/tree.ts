@@ -37,3 +37,17 @@ export function subtreeIds(collections: Collection[], rootId: string): Set<strin
   }
   return ids;
 }
+
+/**
+ * Ids das collections de um project — raízes e pastas.
+ * Environment não guarda `projectId`: ele pende de uma collection raiz, então
+ * é por este conjunto que se decide se um environment é deste project.
+ */
+export function collectionIdsOfProject(
+  collections: Collection[],
+  projectId: string,
+): Set<string> {
+  return new Set(
+    collections.filter((c) => c.projectId === projectId).map((c) => c.id),
+  );
+}

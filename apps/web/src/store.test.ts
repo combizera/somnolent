@@ -112,3 +112,159 @@ describe('withScope: o push carrega o rootCollectionId', () => {
     expect(withScope(tree).collection(tree[0]!).rootCollectionId).toBe('root')
   })
 })
+
+describe('project local amarrado ao project do servidor', () => {
+  const remote = { id: 'srv-1', name: 'Catcher' }
+
+  it('adoptRemoteProject re-etiqueta o project aberto e o que está dentro dele', () => {
+    const antes = useStore.getState()
+    const local = antes.openProjectId!
+    const colLocal = antes.collections.find((c) => c.projectId === local)!
+
+    antes.adoptRemoteProject(remote)
+
+    const s = useStore.getState()
+    expect(s.openProjectId).toBe(remote.id)
+    expect(s.connection.projectId).toBe(remote.id)
+    expect(s.projects.map((p) => p.id)).toContain(remote.id)
+    expect(s.projects.map((p) => p.id)).not.toContain(local)
+    // sem isto a sidebar filtra por projectId e não acha mais nada
+    expect(s.collections.find((c) => c.id === colLocal.id)!.projectId).toBe(remote.id)
+    expect(s.requests.every((r) => r.projectId === remote.id)).toBe(true)
+    // updatedAt novo, senão o push incremental não levaria a re-etiquetagem
+    expect(s.collections[0]!.updatedAt > colLocal.updatedAt).toBe(true)
+  })
+
+  it('enterRemoteProject limpa só o project conectado e preserva os outros', () => {
+    const inicial = useStore.getState()
+    const outro = inicial.openProjectId!
+    // conteúdo antigo do project remoto, de uma conexão anterior
+    useStore.setState({
+      collections: [...inicial.collections, col('c-srv', remote.id, null)],
+      requests: [...inicial.requests, req('r-srv', remote.id, 'c-srv')],
+      environments: [...inicial.environments, env('e-srv', 'c-srv', 'prod')],
+    })
+
+    useStore.getState().enterRemoteProject(remote)
+
+    const s = useStore.getState()
+    expect(s.openProjectId).toBe(remote.id)
+    // o project conectado começa vazio: o primeiro pull traz tudo
+    expect(s.collections.filter((c) => c.projectId === remote.id)).toEqual([])
+    expect(s.requests.filter((r) => r.projectId === remote.id)).toEqual([])
+    expect(s.environments.find((e) => e.id === 'e-srv')).toBeUndefined()
+    // e o project local desta máquina fica intacto
+    expect(s.collections.some((c) => c.projectId === outro)).toBe(true)
+    expect(s.requests.some((r) => r.projectId === outro)).toBe(true)
+    expect(s.environments.some((e) => e.collectionId !== 'c-srv')).toBe(true)
+  })
+
+  it('applyRemote re-etiqueta o que chega com o projectId conectado', () => {
+    useStore.setState({
+      connection: { ...useStore.getState().connection, key: 'somn_x', projectId: remote.id },
+    })
+
+    // linha gravada por um cliente antigo, que subia o projectId local dele
+    useStore.getState().applyRemote(
+      {
+        collections: [col('c-legado', 'projeto-de-outra-maquina', null)],
+        requests: [req('r-legado', 'projeto-de-outra-maquina', 'c-legado')],
+      },
+      {},
+    )
+
+    const s = useStore.getState()
+    expect(s.collections.find((c) => c.id === 'c-legado')!.projectId).toBe(remote.id)
+    expect(s.requests.find((r) => r.id === 'r-legado')!.projectId).toBe(remote.id)
+  })
+})
+
+describe('keyring: a máquina lembra a chave de cada project', () => {
+  const conn = (projectId: string, key: string) => ({
+    scope: 'project' as const,
+    role: 'write' as const,
+    label: 'esta máquina',
+    projectId,
+    projectName: projectId,
+    collectionId: null,
+    key,
+  })
+
+  it('connect guarda a chave e trocar de project reconecta sozinho', () => {
+    const s = useStore.getState()
+    const a = s.openProjectId!
+    const b = s.addProject('Segundo')
+
+    const { key: keyA, ...infoA } = conn(a, 'somn_a')
+    useStore.getState().connect(keyA, infoA)
+    expect(useStore.getState().keyring[a]?.key).toBe('somn_a')
+
+    // troca pro project local: nada de chave, então nada de sync
+    useStore.getState().openProject(b)
+    expect(useStore.getState().connection.key).toBeNull()
+
+    // publica o segundo e volta pro primeiro: a chave do primeiro volta com ele
+    const { key: keyB, ...infoB } = conn(b, 'somn_b')
+    useStore.getState().connect(keyB, infoB)
+    useStore.getState().openProject(a)
+    expect(useStore.getState().connection.key).toBe('somn_a')
+    expect(useStore.getState().connection.projectId).toBe(a)
+    // lastSyncAt é por conexão: trocar tem que forçar um pull completo
+    expect(useStore.getState().lastSyncAt).toBeNull()
+
+    useStore.getState().openProject(b)
+    expect(useStore.getState().connection.key).toBe('somn_b')
+  })
+
+  it('adoptRemoteProject guarda a chave da conexão legada', () => {
+    // Conexão salva antes de o projectId existir: quem amarra é o syncNow,
+    // que chama adoptRemoteProject sem passar por connect().
+    const local = useStore.getState().openProjectId!
+    useStore.setState({
+      connection: { ...useStore.getState().connection, key: 'somn_legado', role: 'write' },
+    })
+
+    useStore.getState().adoptRemoteProject({ id: 'srv-legado', name: 'Legado' })
+
+    const outro = useStore.getState().addProject('Outro')
+    useStore.getState().openProject(outro)
+    useStore.getState().openProject('srv-legado')
+    // sem gravar no keyring, voltar pro project descartaria uma chave viva
+    expect(useStore.getState().connection.key).toBe('somn_legado')
+    expect(local).not.toBe('srv-legado')
+  })
+
+  it('desconectar esquece só a chave do project conectado', () => {
+    const s = useStore.getState()
+    const a = s.openProjectId!
+    const b = s.addProject('Segundo')
+    const { key: keyA, ...infoA } = conn(a, 'somn_a')
+    const { key: keyB, ...infoB } = conn(b, 'somn_b')
+    useStore.getState().connect(keyA, infoA)
+    useStore.getState().connect(keyB, infoB)
+
+    useStore.getState().disconnect()
+
+    const depois = useStore.getState()
+    expect(depois.connection.key).toBeNull()
+    expect(depois.keyring[b]).toBeUndefined()
+    // sem isto, "desconectar" e voltar pro project reconectaria sozinho
+    expect(depois.keyring[a]?.key).toBe('somn_a')
+  })
+
+  it('apagar o project esquece a chave dele', () => {
+    const s = useStore.getState()
+    const a = s.openProjectId!
+    const b = s.addProject('Segundo')
+    const { key, ...info } = conn(b, 'somn_b')
+    useStore.getState().openProject(b)
+    useStore.getState().connect(key, info)
+
+    useStore.getState().deleteProject(b)
+
+    const depois = useStore.getState()
+    expect(depois.keyring[b]).toBeUndefined()
+    expect(depois.openProjectId).toBe(a)
+    expect(depois.connection.key).toBeNull()
+  })
+})

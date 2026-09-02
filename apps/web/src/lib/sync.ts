@@ -1,4 +1,10 @@
-import { rootCollectionOf, type ApiRequest, type Collection, type Environment } from '@somnolent/core'
+import {
+  collectionIdsOfProject,
+  rootCollectionOf,
+  type ApiRequest,
+  type Collection,
+  type Environment,
+} from '@somnolent/core'
 import { api, wsUrl } from './api'
 import { useStore, type PendingDeletes, type RemoteChanges } from '../store'
 
@@ -42,7 +48,7 @@ let syncing = false
 let queued = false
 
 export async function syncNow(): Promise<void> {
-  const s = useStore.getState()
+  let s = useStore.getState()
   const { key, role } = s.connection
   if (!key) return
 
@@ -54,10 +60,28 @@ export async function syncNow(): Promise<void> {
   setStatus('syncing')
 
   try {
+    // Conexão salva antes de o `projectId` existir: amarra agora, senão não há
+    // como saber qual project local corresponde ao do servidor.
+    if (!s.connection.projectId) {
+      const info = await api.me(key)
+      useStore.getState().adoptRemoteProject(info.project)
+      s = useStore.getState()
+    }
+    const projectId = s.connection.projectId!
+
     const since = s.lastSyncAt
     const scope = withScope(s.collections)
     const changedOnly = <T extends { updatedAt: string }>(items: T[]) =>
       since ? items.filter((it) => it.updatedAt > since) : items
+
+    // Sobe só o project conectado. Os outros projects locais são desta máquina:
+    // sem este recorte, todos vazariam pra quem tem a chave deste.
+    const inProject = collectionIdsOfProject(s.collections, projectId)
+    const mine = {
+      collections: s.collections.filter((c) => c.projectId === projectId),
+      requests: s.requests.filter((r) => r.projectId === projectId),
+      environments: s.environments.filter((e) => inProject.has(e.collectionId)),
+    }
 
     const pushedDeletes: PendingDeletes = {
       collections: [...s.pendingDeletes.collections],
@@ -73,9 +97,9 @@ export async function syncNow(): Promise<void> {
       changes: readOnly
         ? {}
         : {
-            collections: changedOnly(s.collections).map(scope.collection),
-            requests: changedOnly(s.requests).map(scope.request),
-            environments: changedOnly(s.environments).map(stripSecrets),
+            collections: changedOnly(mine.collections).map(scope.collection),
+            requests: changedOnly(mine.requests).map(scope.request),
+            environments: changedOnly(mine.environments).map(stripSecrets),
           },
       deletes: readOnly ? {} : { ...pushedDeletes },
     })

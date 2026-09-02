@@ -12,6 +12,7 @@ import {
   Import,
   Layers,
   Plus,
+  Share2,
   Trash2,
   X,
 } from 'lucide-react'
@@ -19,6 +20,7 @@ import { subtreeIds } from '@somnolent/core'
 import type { ApiRequest, Collection } from '@somnolent/core'
 import { bySortOrder, useStore } from '../store'
 import { useConfirm } from '../lib/confirm'
+import { useSession } from '../sessionStore'
 import { ImportModal } from './ImportModal'
 import { MethodChip } from './MethodChip'
 
@@ -408,6 +410,7 @@ export function Sidebar() {
   const openCollection = useStore((s) => s.openCollection)
   const renameCollection = useStore((s) => s.renameCollection)
   const deleteCollection = useStore((s) => s.deleteCollection)
+  const openShare = useSession((s) => s.openShare)
   const confirm = useConfirm()
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -570,7 +573,7 @@ export function Sidebar() {
             ))}
             {items.length === 0 && childCols.length === 0 && (
               <p className="px-2 py-1 text-sm text-ink-faint">
-                {drag?.kind === 'request' ? 'solte aqui' : 'vazia'}
+                {drag?.kind === 'request' ? 'Solte aqui' : 'Vazia'}
               </p>
             )}
           </div>
@@ -699,6 +702,14 @@ export function Sidebar() {
                   {open.name}
                 </span>
               )}
+              <button
+                onClick={() => openShare(open.id)}
+                className="shrink-0 rounded px-1.5 py-1 text-ink-faint transition hover:bg-raised hover:text-ink"
+                title="Compartilhar só esta collection"
+                aria-label="Compartilhar só esta collection"
+              >
+                <Share2 className="size-3.5" />
+              </button>
               <button
                 onClick={async () => {
                   const ok = await confirm({

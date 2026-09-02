@@ -14,8 +14,8 @@ export function KeyValueEditor({
   items,
   onChange,
   ctx,
-  keyPlaceholder = 'chave',
-  valuePlaceholder = 'valor',
+  keyPlaceholder = 'Chave',
+  valuePlaceholder = 'Valor',
 }: Props) {
   const update = (id: string, patch: Partial<KeyValue>) =>
     onChange(items.map((it) => (it.id === id ? { ...it, ...patch } : it)))
