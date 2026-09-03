@@ -24,4 +24,7 @@ EXPOSE 4000
 # SIGTERM do orquestrador em vez de ser derrubado junto com o pnpm, sem chance
 # de fechar o pool do Postgres.
 WORKDIR /app/apps/server
-CMD ["node", "--import", "tsx", "src/index.ts"]
+# `--env-file-if-exists` acompanha o script `start`: quem monta um .env aqui
+# (o painel de deploy sabe criar um) continua sendo lido. Variável de ambiente
+# de verdade tem precedência, então os dois caminhos convivem.
+CMD ["node", "--import", "tsx", "--env-file-if-exists=.env", "src/index.ts"]
