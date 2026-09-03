@@ -27,6 +27,13 @@
   --color-delete: #ef6b76;
   --color-plain: #8b8b9c;
 
+  /* sintaxe do JSON nos editores — chave e valor em cores distintas */
+  --color-syn-key: #8ab4f8;
+  --color-syn-string: #85cf74;
+  --color-syn-number: #efa14e;
+  --color-syn-atom: #c792ea;
+  --color-syn-punct: #6a6a7c;
+
   /* estado semântico — separado da marca */
   --color-ok: #58ad4c;
   --color-info: #4f97e8;

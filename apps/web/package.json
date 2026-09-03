@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/language": "^6.12.4",
     "@codemirror/view": "^6.43.10",
+    "@lezer/highlight": "^1.2.3",
     "@somnolent/core": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
     "@uiw/react-codemirror": "^4.25.11",
