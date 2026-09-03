@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { SIDEBAR, SPLIT_DEFAULT, useLayout } from './layoutStore'
+import { SIDEBAR, SPLIT_DEFAULT, sanitizeLayout, useLayout } from './layoutStore'
 
 const initial = useLayout.getState()
 beforeEach(() => useLayout.setState(initial, true))
@@ -34,5 +34,36 @@ describe('layoutStore', () => {
 
     expect(useLayout.getState().sidebarWidth).toBe(SIDEBAR.default)
     expect(useLayout.getState().requestSplit).toBe(SPLIT_DEFAULT)
+  })
+})
+
+describe('o que volta do navegador', () => {
+  it('null vira o padrão — JSON.stringify(NaN) é null, e ele iria direto pro grid', () => {
+    expect(sanitizeLayout({ sidebarWidth: null, requestSplit: null })).toEqual({
+      sidebarWidth: SIDEBAR.default,
+      requestSplit: SPLIT_DEFAULT,
+    })
+  })
+
+  it('valor fora de faixa é prendido, não descartado', () => {
+    expect(sanitizeLayout({ sidebarWidth: 9999, requestSplit: 3 })).toEqual({
+      sidebarWidth: SIDEBAR.max,
+      requestSplit: 0.95,
+    })
+  })
+
+  it('lixo de qualquer forma cai no padrão', () => {
+    const padrao = { sidebarWidth: SIDEBAR.default, requestSplit: SPLIT_DEFAULT }
+    expect(sanitizeLayout(undefined)).toEqual(padrao)
+    expect(sanitizeLayout({})).toEqual(padrao)
+    expect(sanitizeLayout({ sidebarWidth: '300', requestSplit: {} })).toEqual(padrao)
+    expect(sanitizeLayout({ sidebarWidth: Number.NaN })).toEqual(padrao)
+  })
+
+  it('valor bom passa intacto', () => {
+    expect(sanitizeLayout({ sidebarWidth: 300, requestSplit: 0.4 })).toEqual({
+      sidebarWidth: 300,
+      requestSplit: 0.4,
+    })
   })
 })

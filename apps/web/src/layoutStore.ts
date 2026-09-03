@@ -29,6 +29,26 @@ interface LayoutState {
 const clamp = (v: number, lo: number, hi: number) =>
   Number.isFinite(v) ? Math.min(Math.max(v, lo), hi) : lo
 
+/**
+ * O que veio do navegador não é confiável: pode ser de uma versão anterior do
+ * app, editado à mão, ou — o caso real — um `null`, porque `JSON.stringify(NaN)`
+ * é `null`. O clamp dos setters não cobre isso: o `persist` injeta o valor
+ * guardado direto no estado sem passar por eles, então um valor ruim gravado
+ * uma vez sobreviveria a todo reload e quebraria o grid pra sempre.
+ */
+export function sanitizeLayout(persisted: unknown): Pick<
+  LayoutState,
+  'sidebarWidth' | 'requestSplit'
+> {
+  const saved = (persisted ?? {}) as Partial<Record<'sidebarWidth' | 'requestSplit', unknown>>
+  const num = (v: unknown, lo: number, hi: number, padrao: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? clamp(v, lo, hi) : padrao
+  return {
+    sidebarWidth: num(saved.sidebarWidth, SIDEBAR.min, SIDEBAR.max, SIDEBAR.default),
+    requestSplit: num(saved.requestSplit, 0.05, 0.95, SPLIT_DEFAULT),
+  }
+}
+
 export const useLayout = create<LayoutState>()(
   persist(
     (set) => ({
@@ -41,6 +61,12 @@ export const useLayout = create<LayoutState>()(
       resetSidebar: () => set({ sidebarWidth: SIDEBAR.default }),
       resetSplit: () => set({ requestSplit: SPLIT_DEFAULT }),
     }),
-    { name: 'somnolent-layout' },
+    {
+      name: 'somnolent-layout',
+      // Só os dois números: guardar as funções junto não serve pra nada e
+      // aumenta a chance de reidratar algo estranho.
+      partialize: (s) => ({ sidebarWidth: s.sidebarWidth, requestSplit: s.requestSplit }),
+      merge: (persisted, current) => ({ ...current, ...sanitizeLayout(persisted) }),
+    },
   ),
 )
