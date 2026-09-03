@@ -1,10 +1,48 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Somnolent</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <title>Somnolent — o cliente HTTP que o seu time compartilha</title>
+    <meta
+      name="description"
+      content="Cliente HTTP colaborativo: escreva a request uma vez, troque de environment em um clique e compartilhe o workspace com o time."
+    />
+    <meta name="theme-color" content="#16161b" />
+    <link rel="canonical" href="__SITE_URL__/" />
+
+    <!-- Open Graph. __SITE_URL__ é substituído no build (ver vite.config.ts) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Somnolent" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:url" content="__SITE_URL__/" />
+    <meta property="og:title" content="O cliente HTTP que o seu time compartilha" />
+    <meta
+      property="og:description"
+      content="Templating de variáveis, environments trocáveis e workspace sincronizado."
+    />
+    <meta property="og:image" content="__SITE_URL__/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Somnolent: os três painéis do app — collections, request e response — sobre fundo escuro com gradiente roxo."
+    />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="O cliente HTTP que o seu time compartilha" />
+    <meta
+      name="twitter:description"
+      content="Templating de variáveis, environments trocáveis e workspace sincronizado."
+    />
+    <meta name="twitter:image" content="__SITE_URL__/og-image.jpg" />
+    <meta
+      name="twitter:image:alt"
+      content="Somnolent: os três painéis do app — collections, request e response — sobre fundo escuro com gradiente roxo."
+    />
   </head>
   <body>
     <div id="root"></div>
