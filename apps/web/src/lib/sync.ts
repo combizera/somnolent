@@ -46,6 +46,8 @@ function stripSecrets(env: Environment): Environment {
 
 let syncing = false
 let queued = false
+/** Falhas seguidas — alimenta o recuo do polling. Zera no primeiro sucesso. */
+let failures = 0
 
 export async function syncNow(): Promise<void> {
   let s = useStore.getState()
@@ -108,9 +110,13 @@ export async function syncNow(): Promise<void> {
     store.applyRemote(result.changes as RemoteChanges, result.deletes as Partial<PendingDeletes>)
     if (!readOnly) store.clearPendingDeletes(pushedDeletes)
     store.setLastSyncAt(result.now)
+    failures = 0
     setStatus('ok')
   } catch (err) {
-    console.error('sync falhou:', err)
+    // Só o primeiro erro da sequência vai pro console: com a API fora do ar,
+    // logar cada tentativa enterrava o resto das mensagens.
+    if (failures === 0) console.error('sync falhou:', err)
+    failures++
     setStatus('error')
   } finally {
     syncing = false
@@ -119,6 +125,35 @@ export async function syncNow(): Promise<void> {
       void syncNow()
     }
   }
+}
+
+/**
+ * O caminho normal do sync é reativo: mudança local dispara push (debounce de
+ * 1200ms) e o WebSocket avisa de mudança remota. O polling abaixo existe só pro
+ * caso do socket morrer calado — readyState continua OPEN e nada mais chega.
+ *
+ * Com o socket aberto ele é raro (5 min). Sem socket, cai pros 20s e recua
+ * exponencialmente a cada falha, até 5 min: contra uma API fora do ar, insistir
+ * de 20 em 20 segundos pra sempre só gasta bateria e enche o console.
+ */
+const POLL_WS_OPEN_MS = 5 * 60_000
+const POLL_WS_DOWN_MS = 20_000
+const POLL_MAX_MS = 5 * 60_000
+
+let pollTimer: ReturnType<typeof setTimeout> | undefined
+
+function pollDelay(): number {
+  if (ws?.readyState === WebSocket.OPEN && failures === 0) return POLL_WS_OPEN_MS
+  const base = POLL_WS_DOWN_MS * 2 ** Math.min(failures, 10)
+  return Math.min(failures === 0 ? POLL_WS_DOWN_MS : base, POLL_MAX_MS)
+}
+
+function schedulePoll() {
+  clearTimeout(pollTimer)
+  pollTimer = setTimeout(() => {
+    if (useStore.getState().connection.key) void syncNow()
+    schedulePoll()
+  }, pollDelay())
 }
 
 let started = false
@@ -174,10 +209,7 @@ export function startSyncEngine() {
     }
   })
 
-  // Polling de segurança caso o WebSocket caia sem avisar.
-  setInterval(() => {
-    if (useStore.getState().connection.key) void syncNow()
-  }, 20_000)
+  schedulePoll()
 
   // Sync inicial se a chave persistida ainda estiver lá.
   const s = useStore.getState()

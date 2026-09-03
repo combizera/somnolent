@@ -54,3 +54,46 @@ describe('syncNow sobe só o project conectado', () => {
     expect(payload.changes.collections.length).toBeGreaterThan(0)
   })
 })
+
+describe('sequência de falhas', () => {
+  /** Deixa o store com uma conexão válida, senão syncNow retorna sem fazer nada. */
+  function conectado() {
+    const s = useStore.getState()
+    useStore.setState({
+      connection: {
+        ...s.connection,
+        key: 'somn_x',
+        role: 'write',
+        scope: 'project',
+        projectId: s.openProjectId!,
+      },
+    })
+  }
+
+  it('loga só o primeiro erro da sequência, não um por tentativa', async () => {
+    conectado()
+    const console_ = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    // um sucesso primeiro zera o contador de falhas, que é estado de módulo
+    sync.mockResolvedValueOnce({ now: '2026-09-02T00:00:00.000Z', changes: {}, deletes: {} })
+    await syncNow()
+
+    sync.mockRejectedValue(new Error('Failed to fetch'))
+    await syncNow()
+    await syncNow()
+    await syncNow()
+
+    // Com a API fora do ar o polling insiste sozinho; um log por tentativa
+    // enterrava qualquer outra mensagem no console.
+    expect(console_).toHaveBeenCalledTimes(1)
+
+    // e volta a logar depois que a coisa se recupera e quebra de novo
+    sync.mockResolvedValueOnce({ now: '2026-09-02T00:00:00.000Z', changes: {}, deletes: {} })
+    await syncNow()
+    await syncNow()
+    expect(console_).toHaveBeenCalledTimes(2)
+
+    console_.mockRestore()
+    sync.mockReset()
+  })
+})
