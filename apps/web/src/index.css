@@ -133,6 +133,18 @@ input:disabled,
   cursor: not-allowed;
 }
 
+/* redimensionando painel: o cursor não muda ao passar por cima do conteúdo,
+   e nada é selecionado por engano durante o arraste */
+body.is-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+body.is-resizing iframe,
+body.is-resizing .cm-editor {
+  pointer-events: none;
+}
+
 /* arraste: o item some parcialmente e o ponteiro vira "agarrando" */
 body.is-dragging,
 body.is-dragging * {

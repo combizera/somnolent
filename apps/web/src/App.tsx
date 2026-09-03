@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { Logo } from './components/Logo'
 import { EmptyState } from './components/EmptyState'
 import { Sidebar } from './components/Sidebar'
@@ -10,8 +11,13 @@ import { CommandPalette } from './components/CommandPalette'
 import { ConfirmProvider } from './components/ConfirmDialog'
 import { RequestPanel } from './components/RequestPanel'
 import { ResponsePanel } from './components/ResponsePanel'
+import { ResizeHandle } from './components/ResizeHandle'
 import { useActiveEnv, useSelectedRequest, useStore } from './store'
 import { useSession } from './sessionStore'
+import { PANE_MIN, SIDEBAR, useLayout } from './layoutStore'
+
+/** Largura da coluna de cada divisor, em px. Entra direto no grid abaixo. */
+const HANDLE = 5
 
 function App() {
   const active = useActiveEnv()
@@ -27,6 +33,46 @@ function App() {
   }
   // Cor do environment: sinal de contexto, não cor de interface.
   const envColor = active?.color ?? 'transparent'
+
+  const main = useRef<HTMLElement>(null)
+  const sidebarWidth = useLayout((s) => s.sidebarWidth)
+  const requestSplit = useLayout((s) => s.requestSplit)
+  const setSidebarWidth = useLayout((s) => s.setSidebarWidth)
+  const setRequestSplit = useLayout((s) => s.setRequestSplit)
+  const resetSidebar = useLayout((s) => s.resetSidebar)
+  const resetSplit = useLayout((s) => s.resetSplit)
+
+  /** Quanto sobra pra request + response depois da sidebar e dos divisores. */
+  const paneArea = () => {
+    const box = main.current?.getBoundingClientRect()
+    if (!box) return null
+    const handles = request ? HANDLE * 2 : HANDLE
+    return { left: box.left, available: box.width - sidebarWidth - handles }
+  }
+
+  /**
+   * O teto da sidebar não é só o SIDEBAR.max: numa janela estreita ela precisa
+   * parar antes, pra request e response continuarem com PANE_MIN cada.
+   */
+  const applySidebar = (px: number) => {
+    const box = main.current?.getBoundingClientRect()
+    if (!box) return setSidebarWidth(px)
+    const handles = request ? HANDLE * 2 : HANDLE
+    const panesNeed = request ? PANE_MIN * 2 : PANE_MIN
+    const roof = Math.min(SIDEBAR.max, box.width - handles - panesNeed)
+    // Janela minúscula: respeita o piso da sidebar e deixa o resto apertar.
+    setSidebarWidth(Math.min(px, Math.max(roof, SIDEBAR.min)))
+  }
+
+  const applySplit = (fraction: number) => {
+    const area = paneArea()
+    if (!area || area.available <= 0) return setRequestSplit(fraction)
+    // Converte o piso em px em piso de fração. Se nem 2×PANE_MIN cabe, cai no
+    // meio a meio em vez de travar num extremo.
+    const floor = PANE_MIN / area.available
+    if (floor >= 0.5) return setRequestSplit(0.5)
+    setRequestSplit(Math.min(Math.max(fraction, floor), 1 - floor))
+  }
 
   return (
     <ConfirmProvider>
@@ -80,11 +126,46 @@ function App() {
         <CommandPalette />
         <ShareDialog />
 
-        <main className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] grid-cols-[272px_minmax(0,1fr)_minmax(0,1fr)]">
+        <main
+          ref={main}
+          className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
+          style={{
+            gridTemplateColumns: request
+              ? `${sidebarWidth}px ${HANDLE}px minmax(0,${requestSplit}fr) ${HANDLE}px minmax(0,${1 - requestSplit}fr)`
+              : `${sidebarWidth}px ${HANDLE}px minmax(0,1fr)`,
+          }}
+        >
           <Sidebar />
+          <ResizeHandle
+            label="Largura da sidebar"
+            onDrag={(clientX) => {
+              const box = main.current?.getBoundingClientRect()
+              if (box) applySidebar(clientX - box.left)
+            }}
+            onStep={(delta) => applySidebar(sidebarWidth + delta)}
+            onReset={resetSidebar}
+          />
           {request ? (
             <>
               <RequestPanel key={request.id} request={request} />
+              <ResizeHandle
+                label="Divisão entre request e response"
+                onDrag={(clientX) => {
+                  const area = paneArea()
+                  // Sem o teste de `available`, uma janela degenerada dividiria
+                  // por zero e gravaria NaN na fração.
+                  if (area && area.available > 0) {
+                    applySplit((clientX - area.left - sidebarWidth - HANDLE) / area.available)
+                  }
+                }}
+                onStep={(delta) => {
+                  const area = paneArea()
+                  if (area && area.available > 0) {
+                    applySplit(requestSplit + delta / area.available)
+                  }
+                }}
+                onReset={resetSplit}
+              />
               <ResponsePanel key={`res-${request.id}`} requestId={request.id} />
             </>
           ) : (

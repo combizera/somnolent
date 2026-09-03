@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import App from './App'
 import { useStore } from './store'
 import { useSession } from './sessionStore'
+import { SIDEBAR, useLayout } from './layoutStore'
 
 /**
  * Smoke test de render. Não é sobre pixels: é sobre a classe de bug que nem
@@ -18,9 +19,11 @@ const initialState = useStore.getState()
 /** O sessionStore também é singleton de módulo: uma response de um caso
  *  apareceria no seguinte se não voltasse ao zero aqui. */
 const initialSession = useSession.getState()
+const initialLayout = useLayout.getState()
 beforeEach(() => {
   useStore.setState(initialState, true)
   useSession.setState(initialSession, true)
+  useLayout.setState(initialLayout, true)
 })
 afterEach(cleanup)
 
@@ -345,6 +348,121 @@ describe('header', () => {
     expect(select.className).toContain('focus-visible:outline-none')
     // ...e o grupo em volta é quem reage ao foco
     expect(select.closest('div.rounded-md')!.className).toContain('focus-within:border-brand')
+  })
+})
+
+describe('redimensionar os painéis', () => {
+  /**
+   * jsdom não faz layout: sem forjar o rect, `box.width` é 0 e o clamp acharia
+   * que a janela não cabe nada. 1400px é uma janela plausível.
+   */
+  function janelaDe(width: number) {
+    const original = Element.prototype.getBoundingClientRect
+    Element.prototype.getBoundingClientRect = function () {
+      return { left: 0, top: 0, right: width, bottom: 800, width, height: 800, x: 0, y: 0, toJSON: () => ({}) }
+    }
+    return () => {
+      Element.prototype.getBoundingClientRect = original
+    }
+  }
+
+  function comRequest() {
+    const s = useStore.getState()
+    s.selectRequest(s.requests[0]!.id)
+  }
+
+  it('tem um divisor por junção: dois com request aberta, um sem', () => {
+    comRequest()
+    const { unmount } = render(<App />)
+    expect(screen.getAllByRole('separator')).toHaveLength(2)
+    unmount()
+
+    useStore.getState().selectRequest(null)
+    render(<App />)
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
+  })
+
+  it('seta do teclado move a sidebar, e Shift move mais rápido', () => {
+    const restaura = janelaDe(1400)
+    comRequest()
+    render(<App />)
+    const divisor = screen.getByRole('separator', { name: 'Largura da sidebar' })
+
+    fireEvent.keyDown(divisor, { key: 'ArrowRight' })
+    expect(useLayout.getState().sidebarWidth).toBe(SIDEBAR.default + 16)
+
+    fireEvent.keyDown(divisor, { key: 'ArrowRight', shiftKey: true })
+    expect(useLayout.getState().sidebarWidth).toBe(SIDEBAR.default + 16 + 64)
+
+    fireEvent.keyDown(divisor, { key: 'ArrowLeft' })
+    expect(useLayout.getState().sidebarWidth).toBe(SIDEBAR.default + 64)
+    restaura()
+  })
+
+  it('respeita o mínimo e o máximo da sidebar', () => {
+    const restaura = janelaDe(1400)
+    comRequest()
+    render(<App />)
+    const divisor = screen.getByRole('separator', { name: 'Largura da sidebar' })
+
+    for (let i = 0; i < 60; i++) fireEvent.keyDown(divisor, { key: 'ArrowLeft', shiftKey: true })
+    expect(useLayout.getState().sidebarWidth).toBe(SIDEBAR.min)
+
+    for (let i = 0; i < 60; i++) fireEvent.keyDown(divisor, { key: 'ArrowRight', shiftKey: true })
+    expect(useLayout.getState().sidebarWidth).toBe(SIDEBAR.max)
+    restaura()
+  })
+
+  it('numa janela estreita a sidebar para antes do máximo pra não sufocar os painéis', () => {
+    // 900px: 900 - 10 de divisores - 2×320 de piso = 250 de teto, bem abaixo do máximo
+    const restaura = janelaDe(900)
+    comRequest()
+    render(<App />)
+    const divisor = screen.getByRole('separator', { name: 'Largura da sidebar' })
+
+    for (let i = 0; i < 60; i++) fireEvent.keyDown(divisor, { key: 'ArrowRight', shiftKey: true })
+    expect(useLayout.getState().sidebarWidth).toBe(250)
+    expect(useLayout.getState().sidebarWidth).toBeLessThan(SIDEBAR.max)
+    restaura()
+  })
+
+  it('a divisão request/response não deixa nenhum lado abaixo do piso', () => {
+    const restaura = janelaDe(1400)
+    comRequest()
+    render(<App />)
+    const divisor = screen.getByRole('separator', { name: 'Divisão entre request e response' })
+
+    // sobra = 1400 - 272 - 10 = 1118; piso de 320px = 0.2862 de fração
+    const piso = 320 / 1118
+    for (let i = 0; i < 60; i++) fireEvent.keyDown(divisor, { key: 'ArrowLeft', shiftKey: true })
+    expect(useLayout.getState().requestSplit).toBeCloseTo(piso, 3)
+
+    for (let i = 0; i < 60; i++) fireEvent.keyDown(divisor, { key: 'ArrowRight', shiftKey: true })
+    expect(useLayout.getState().requestSplit).toBeCloseTo(1 - piso, 3)
+    restaura()
+  })
+
+  it('duplo clique volta ao padrão', () => {
+    const restaura = janelaDe(1400)
+    comRequest()
+    render(<App />)
+    const divisor = screen.getByRole('separator', { name: 'Largura da sidebar' })
+
+    fireEvent.keyDown(divisor, { key: 'ArrowRight', shiftKey: true })
+    expect(useLayout.getState().sidebarWidth).not.toBe(SIDEBAR.default)
+
+    fireEvent.doubleClick(divisor)
+    expect(useLayout.getState().sidebarWidth).toBe(SIDEBAR.default)
+    restaura()
+  })
+
+  it('a largura entra no grid, não em style de cada painel', () => {
+    comRequest()
+    const { container } = render(<App />)
+    const main = container.querySelector('main')!
+    expect(main.style.gridTemplateColumns).toContain(`${SIDEBAR.default}px`)
+    // duas colunas de 5px: os dois divisores
+    expect(main.style.gridTemplateColumns.match(/5px/g)).toHaveLength(2)
   })
 })
 
