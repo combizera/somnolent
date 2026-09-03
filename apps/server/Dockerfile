@@ -19,4 +19,9 @@ COPY apps/server apps/server
 ENV NODE_ENV=production
 ENV PORT=4000
 EXPOSE 4000
-CMD ["pnpm", "--filter", "@somnolent/server", "start"]
+
+# node direto, e não `pnpm start`: assim o processo é o PID 1 e recebe o
+# SIGTERM do orquestrador em vez de ser derrubado junto com o pnpm, sem chance
+# de fechar o pool do Postgres.
+WORKDIR /app/apps/server
+CMD ["node", "--import", "tsx", "src/index.ts"]

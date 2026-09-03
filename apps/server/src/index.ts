@@ -21,3 +21,20 @@ await migrate(db, { migrationsFolder })
 const app = buildApp({ db, createToken: CREATE_TOKEN })
 await app.listen({ port: PORT, host: '0.0.0.0' })
 console.log(`somnolent server em http://localhost:${PORT}`)
+
+// Orquestrador reinicia contêiner o tempo todo (deploy, health check, reschedule).
+// Sem isto, cada parada corta requests no meio e deixa conexão pendurada no
+// Postgres até o servidor expirar por conta própria.
+let closing = false
+for (const sinal of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(sinal, () => {
+    if (closing) return
+    closing = true
+    console.log(`${sinal} recebido, encerrando…`)
+    void app
+      .close()
+      .then(() => pool.end())
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1))
+  })
+}
