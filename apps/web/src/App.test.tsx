@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 import { useStore } from './store'
@@ -362,6 +362,57 @@ describe('header', () => {
     expect(select.className).toContain('focus-visible:outline-none')
     // ...e o grupo em volta é quem reage ao foco
     expect(select.closest('div.rounded-md')!.className).toContain('focus-within:border-brand')
+  })
+})
+
+describe('painel de sync', () => {
+  function conectado() {
+    const project = useStore.getState().projects[0]!
+    useStore.setState({
+      connection: {
+        key: 'somn_x',
+        scope: 'project',
+        role: 'write',
+        label: 'Esta máquina',
+        projectId: project.id,
+        projectName: project.name,
+        collectionId: null,
+      },
+      lastSyncAt: new Date().toISOString(),
+    })
+    // o painel lista chaves ao abrir; sem isto o jsdom reclama de fetch
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
+  }
+
+  it('mostra os fatos da conexão sem rótulo em caixa alta', () => {
+    conectado()
+    const { container } = render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /Sync/ }))
+
+    expect(screen.getByText('Project inteiro')).toBeDefined()
+    expect(screen.getByText('Leitura e escrita')).toBeDefined()
+    expect(screen.getByText('Esta máquina')).toBeDefined()
+    expect(screen.getByText(/Sincronizado agora mesmo/)).toBeDefined()
+
+    // O bloco de fatos não usa mais o rótulo tracked-out em maiúsculas, que era
+    // o que deixava chave e valor desalinhados em duas colunas.
+    expect(screen.queryByText('Compartilhado')).toBeNull()
+    expect(screen.queryByText('Último sync')).toBeNull()
+    expect(container.querySelector('dl')).toBeNull()
+
+    vi.unstubAllGlobals()
+  })
+
+  it('a lista de chaves tem teto e rola', () => {
+    conectado()
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /Sync/ }))
+
+    const lista = screen.getByText('Chaves ativas').parentElement!.querySelector('.overflow-y-auto')
+    expect(lista).not.toBeNull()
+    expect(lista!.className).toMatch(/max-h-/)
+
+    vi.unstubAllGlobals()
   })
 })
 

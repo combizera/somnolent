@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Eye, KeyRound, Link2, Plus, Trash2 } from 'lucide-react'
+import { Boxes, Eye, FolderClosed, KeyRound, Link2, PenLine, Plus, Trash2 } from 'lucide-react'
 import { api, ApiError, type KeyRow } from '../lib/api'
 import { onSyncStatus, syncNow, type SyncStatus } from '../lib/sync'
 import { useStore } from '../store'
@@ -161,18 +161,28 @@ function Connect() {
   )
 }
 
-/** "13:35:02" não diz se foi agora ou ontem. Isto diz. */
+/** "13:35:02" não diz se foi agora ou ontem. Isto diz, e numa frase inteira. */
 function lastSyncLabel(iso: string | null): string {
-  if (!iso) return 'ainda não sincronizou'
+  if (!iso) return 'Ainda não sincronizou'
   const date = new Date(iso)
   const ms = Date.now() - date.getTime()
-  if (ms < 60_000) return 'agora mesmo'
+  if (ms < 60_000) return 'Sincronizado agora mesmo'
   const min = Math.floor(ms / 60_000)
-  if (min < 60) return `há ${min} min`
+  if (min < 60) return `Sincronizado há ${min} min`
   const hora = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   return date.toDateString() === new Date().toDateString()
-    ? `hoje às ${hora}`
-    : `${date.toLocaleDateString('pt-BR')} às ${hora}`
+    ? `Sincronizado hoje às ${hora}`
+    : `Sincronizado em ${date.toLocaleDateString('pt-BR')}, ${hora}`
+}
+
+/** Um fato da conexão: ícone fixo + texto. Sem rótulo — o ícone é o rótulo. */
+function Fact({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="shrink-0 text-ink-faint">{icon}</span>
+      <span className="truncate">{children}</span>
+    </span>
+  )
 }
 
 /** Conectado: estado, chaves emitidas e o botão de compartilhar. */
@@ -200,39 +210,56 @@ function Connected() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-start gap-3">
-          <h2 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold text-ink">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
             <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[status]}`} />
             <span className="truncate">{connection.projectName}</span>
           </h2>
-          <button
-            onClick={() => void syncNow()}
-            className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
-          >
-            Sincronizar agora
-          </button>
+
+          {/* Tudo abaixo alinha na mesma sangria do nome do project — a bolinha
+              tem 8px e o gap 8px, então pl-4. É esse prumo que faltava. */}
+          <p className="mt-1 pl-4 text-sm text-ink-faint" title={lastSyncAt ?? undefined}>
+            {lastSyncLabel(lastSyncAt)}
+          </p>
+
+          {/* Sem rótulo em caixa alta: o ícone diz o que o valor é, e os três
+              fatos cabem numa linha só, então não há coluna pra desalinhar. */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-4 text-sm text-ink-dim">
+            <Fact
+              icon={
+                connection.scope === 'collection' ? (
+                  <FolderClosed aria-hidden className="size-3.5" />
+                ) : (
+                  <Boxes aria-hidden className="size-3.5" />
+                )
+              }
+            >
+              {connection.scope === 'collection' ? 'Uma collection' : 'Project inteiro'}
+            </Fact>
+
+            <Fact
+              icon={
+                readOnly ? (
+                  <Eye aria-hidden className="size-3.5" />
+                ) : (
+                  <PenLine aria-hidden className="size-3.5" />
+                )
+              }
+            >
+              {readOnly ? 'Somente leitura' : 'Leitura e escrita'}
+            </Fact>
+
+            <Fact icon={<KeyRound aria-hidden className="size-3.5" />}>{connection.label}</Fact>
+          </div>
         </div>
 
-        {/* Uma frase corrida com três fatos separados por · obrigava a decorar a
-            ordem pra entender o que era o quê. Cada fato agora tem rótulo. */}
-        <dl className="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-2 text-sm">
-          <dt className={label}>Compartilhado</dt>
-          <dd className="text-ink">
-            {connection.scope === 'collection' ? 'Uma collection' : 'O project inteiro'}
-          </dd>
-
-          <dt className={label}>Você pode</dt>
-          <dd className="text-ink">{readOnly ? 'Só ler' : 'Ler e escrever'}</dd>
-
-          <dt className={label}>Sua chave</dt>
-          <dd className="truncate text-ink">{connection.label}</dd>
-
-          <dt className={label}>Último sync</dt>
-          <dd className="text-ink" title={lastSyncAt ?? undefined}>
-            {lastSyncLabel(lastSyncAt)}
-          </dd>
-        </dl>
+        <button
+          onClick={() => void syncNow()}
+          className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
+        >
+          Sincronizar agora
+        </button>
       </div>
 
       {readOnly && (
