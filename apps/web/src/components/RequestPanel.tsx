@@ -14,6 +14,8 @@ import {
   type KeyValue,
   type RequestAuth,
 } from '@somnolent/core'
+import { codeTheme } from '../lib/codeTheme'
+import { copyText } from '../lib/clipboard'
 import { useActiveEnv, useBaseEnv, useStore } from '../store'
 import { useSession } from '../sessionStore'
 import { sendRequest } from '../lib/send'
@@ -316,18 +318,7 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
   }
 
   const copyCurl = async () => {
-    const text = toCurl(resolveRequest(request, base, active))
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch {
-      // Sem permissão de clipboard: fallback via textarea temporária.
-      const ta = document.createElement('textarea')
-      ta.value = text
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      ta.remove()
-    }
+    await copyText(toCurl(resolveRequest(request, base, active)))
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
@@ -538,10 +529,10 @@ export function RequestPanel({ request }: { request: ApiRequest }) {
                   onChange={(body) => updateRequest(request.id, { body })}
                   extensions={
                     request.bodyType === 'json'
-                      ? [json(), EditorView.lineWrapping]
-                      : [EditorView.lineWrapping]
+                      ? [json(), EditorView.lineWrapping, codeTheme]
+                      : [EditorView.lineWrapping, codeTheme]
                   }
-                  theme="dark"
+                  theme="none"
                   height="100%"
                   style={{ height: '100%' }}
                 />

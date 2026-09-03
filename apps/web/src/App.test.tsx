@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 import { useStore } from './store'
+import { useSession } from './sessionStore'
 
 /**
  * Smoke test de render. Não é sobre pixels: é sobre a classe de bug que nem
@@ -14,7 +15,13 @@ import { useStore } from './store'
  * os seguintes. Guarda o estado inicial e devolve ele antes de cada caso.
  */
 const initialState = useStore.getState()
-beforeEach(() => useStore.setState(initialState, true))
+/** O sessionStore também é singleton de módulo: uma response de um caso
+ *  apareceria no seguinte se não voltasse ao zero aqui. */
+const initialSession = useSession.getState()
+beforeEach(() => {
+  useStore.setState(initialState, true)
+  useSession.setState(initialSession, true)
+})
 afterEach(cleanup)
 
 describe('App', () => {
@@ -163,6 +170,106 @@ describe('editores de código', () => {
 
     // classe que o CodeMirror aplica quando lineWrapping está ligado
     expect(container.querySelector('.cm-lineWrapping')).not.toBeNull()
+  })
+})
+
+describe('response de JSON grande', () => {
+  /** Coloca uma response pronta na sessão, como se o envio tivesse voltado. */
+  function comResponse(body: string) {
+    const s = useStore.getState()
+    const id = s.requests[0]!.id
+    s.selectRequest(id)
+    useSession.getState().setResponse(id, {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      timeMs: 12,
+      sizeBytes: body.length,
+      headers: [{ key: 'content-type', value: 'application/json' }],
+      body,
+    })
+    return id
+  }
+
+  const grande = JSON.stringify({
+    data: Array.from({ length: 200 }, (_, i) => ({
+      id: i,
+      nome: `advogado ${i}`,
+      ativo: i % 2 === 0,
+      total: i * 3.5,
+      apelido: null,
+    })),
+  })
+
+  it('quem rola é o CodeMirror, não um wrapper por fora dele', () => {
+    comResponse(grande)
+    const { container } = render(<App />)
+
+    const editor = container.querySelectorAll('.cm-editor')
+    // duas: a do body da request e a da response
+    expect(editor.length).toBeGreaterThanOrEqual(1)
+
+    const scroller = container.querySelectorAll('.cm-scroller')
+    expect(scroller.length).toBeGreaterThanOrEqual(1)
+
+    // Nenhum ancestral do editor da response pode ser um container de scroll:
+    // dois scrolls aninhados se anulam e o vertical some.
+    const resposta = container.querySelectorAll('.cm-editor')
+    for (const ed of resposta) {
+      let node = ed.parentElement
+      while (node && node.tagName !== 'SECTION') {
+        expect(node.className).not.toContain('overflow-y-auto')
+        node = node.parentElement
+      }
+    }
+  })
+
+  it('o botão copiar leva o JSON formatado pro clipboard', async () => {
+    const escrito: string[] = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: (t: string) => {
+          escrito.push(t)
+          return Promise.resolve()
+        },
+      },
+    })
+
+    comResponse('{"nome":"ygor","total":42}')
+    render(<App />)
+
+    fireEvent.click(screen.getByTitle('Copiar o body da response'))
+
+    await waitFor(() => expect(escrito).toHaveLength(1))
+    // o que vai pro clipboard é o texto indentado que o editor mostra
+    expect(escrito[0]).toBe('{\n  "nome": "ygor",\n  "total": 42\n}')
+    await waitFor(() => expect(screen.getByText('Copiado')).toBeDefined())
+  })
+
+  it('sem response, não existe botão de copiar', () => {
+    useStore.getState().selectRequest(useStore.getState().requests[0]!.id)
+    render(<App />)
+    expect(screen.queryByTitle('Copiar o body da response')).toBeNull()
+  })
+
+  it('pinta chave e valor com as cores da paleta do app', () => {
+    comResponse(JSON.stringify({ nome: 'ygor', total: 42, ativo: true, apelido: null }))
+    const { container } = render(<App />)
+
+    // O CodeMirror gera uma classe por estilo do HighlightStyle: chave, string,
+    // número e átomo têm cores distintas, então são classes distintas.
+    const classes = [...container.querySelectorAll('.cm-line span[class]')].map((el) =>
+      el.getAttribute('class'),
+    )
+    expect(new Set(classes.filter((c) => c?.includes('ͼ'))).size).toBeGreaterThanOrEqual(4)
+
+    // E as cores são as nossas, não as do tema genérico da lib: o CodeMirror
+    // injeta o CSS do HighlightStyle no head, então dá pra conferir lá.
+    const css = [...document.querySelectorAll('style')].map((el) => el.textContent).join('\n')
+    for (const token of ['--color-syn-key', '--color-syn-string', '--color-syn-number']) {
+      expect(css).toContain(token)
+    }
   })
 })
 

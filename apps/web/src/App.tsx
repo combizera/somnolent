@@ -68,7 +68,7 @@ function App() {
         <CommandPalette />
         <ShareDialog />
 
-        <main className="grid min-h-0 flex-1 grid-cols-[272px_minmax(0,1fr)_minmax(0,1fr)]">
+        <main className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] grid-cols-[272px_minmax(0,1fr)_minmax(0,1fr)]">
           <Sidebar />
           {request ? (
             <>

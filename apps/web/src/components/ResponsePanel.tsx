@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { Check, Copy, X } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import { EditorView } from '@codemirror/view'
+import { codeTheme } from '../lib/codeTheme'
+import { copyText } from '../lib/clipboard'
 import { useStore, type HistoryEntry } from '../store'
 import { useSession } from '../sessionStore'
 import { formatSize, formatTime } from '../lib/send'
@@ -53,11 +55,22 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
   const clearHistory = useStore((s) => s.clearHistory)
   const [tab, setTab] = useState<Tab>('body')
   const [viewingId, setViewingId] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const viewingEntry: HistoryEntry | null =
     viewingId !== null ? (history.find((h) => h.id === viewingId) ?? null) : null
 
   const view: View | null = viewingEntry ? viewingEntry : response?.ok ? response : null
+
+  // Formatado uma vez: é o mesmo texto que o editor mostra e que o botão copia.
+  const pretty = view ? prettyBody(view.body) : null
+
+  const copy = async () => {
+    if (!pretty) return
+    await copyText(pretty.text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'body', label: 'Body' },
@@ -132,35 +145,53 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
                 )}
               </button>
             ))}
+
+            {pretty && pretty.text.length > 0 && (
+              <button
+                onClick={copy}
+                className="my-1 ml-auto flex shrink-0 items-center gap-1 self-center rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
+                title="Copiar o body da response"
+              >
+                {copied ? (
+                  <>
+                    <Check className="size-3" />
+                    Copiado
+                  </>
+                ) : (
+                  <>
+                    <Copy className="size-3" />
+                    Copiar
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {tab === 'body' &&
-              (view ? (
-                (() => {
-                  const { text, isJson } = prettyBody(view.body)
-                  return (
-                    <CodeMirror
-                      value={text}
-                      readOnly
-                      // Quebra a linha em vez de abrir scroll lateral: resposta
-                      // com uma linha gigante é a regra, não a exceção.
-                      extensions={isJson ? [json(), WRAP] : [WRAP]}
-                      theme="dark"
-                      height="100%"
-                      style={{ height: '100%' }}
-                    />
-                  )
-                })()
-              ) : (
-                <p className="p-4 text-sm text-ink-faint">
-                  Aperte <span className="font-semibold text-ink-dim">Enviar</span> para ver a
-                  response aqui.
-                </p>
-              ))}
+          {tab === 'body' &&
+            (pretty ? (
+              // overflow-hidden, e não auto: quem rola é o .cm-scroller do
+              // CodeMirror. Dois containers de scroll aninhados se anulam.
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <CodeMirror
+                  value={pretty.text}
+                  readOnly
+                  // Quebra a linha em vez de abrir scroll lateral: resposta
+                  // com uma linha gigante é a regra, não a exceção.
+                  extensions={pretty.isJson ? [json(), WRAP, codeTheme] : [WRAP, codeTheme]}
+                  theme="none"
+                  height="100%"
+                  style={{ height: '100%' }}
+                />
+              </div>
+            ) : (
+              <p className="p-4 text-sm text-ink-faint">
+                Aperte <span className="font-semibold text-ink-dim">Enviar</span> para ver a
+                response aqui.
+              </p>
+            ))}
 
-            {tab === 'headers' && (
-              <div className="p-3">
+          {tab === 'headers' && (
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
                 {view && view.headers.length > 0 ? (
                   <table className="w-full font-mono text-sm">
                     <tbody>
@@ -180,8 +211,8 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
               </div>
             )}
 
-            {tab === 'history' && (
-              <div className="p-3">
+          {tab === 'history' && (
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
                 {history.length === 0 ? (
                   <p className="text-sm text-ink-faint">
                     Cada envio desta request fica registrado aqui.
@@ -224,9 +255,8 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
                     </button>
                   </>
                 )}
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
     </section>
