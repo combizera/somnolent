@@ -103,7 +103,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
                   className="rounded-md border border-line bg-app px-3 py-2 text-center"
                 >
                   <p className="font-mono text-xl text-ink">{item.value}</p>
-                  <p className="text-[10px] tracking-wider text-ink-faint uppercase">
+                  <p className="text-xs tracking-wider text-ink-faint uppercase">
                     {item.label}
                   </p>
                 </div>

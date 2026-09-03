@@ -175,10 +175,22 @@ function lastSyncLabel(iso: string | null): string {
     : `Sincronizado em ${date.toLocaleDateString('pt-BR')}, ${hora}`
 }
 
-/** Um fato da conexão: ícone fixo + texto. Sem rótulo — o ícone é o rótulo. */
-function Fact({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+/**
+ * Um fato da conexão: ícone + texto, sem rótulo — o ícone é o rótulo.
+ * `fixo` protege os fatos de texto conhecido; quem cede espaço numa janela
+ * apertada é só o rótulo da chave, que é o único de tamanho imprevisível.
+ */
+function Fact({
+  icon,
+  fixo = false,
+  children,
+}: {
+  icon: React.ReactNode
+  fixo?: boolean
+  children: React.ReactNode
+}) {
   return (
-    <span className="flex min-w-0 items-center gap-1.5">
+    <span className={`flex min-w-0 items-center gap-1.5 ${fixo ? 'shrink-0' : ''}`}>
       <span className="shrink-0 text-ink-faint">{icon}</span>
       <span className="truncate">{children}</span>
     </span>
@@ -210,56 +222,61 @@ function Connected() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[status]}`} />
-            <span className="truncate">{connection.projectName}</span>
-          </h2>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[status]}`} />
+              <span className="truncate">{connection.projectName}</span>
+            </h2>
 
-          {/* Tudo abaixo alinha na mesma sangria do nome do project — a bolinha
-              tem 8px e o gap 8px, então pl-4. É esse prumo que faltava. */}
-          <p className="mt-1 pl-4 text-sm text-ink-faint" title={lastSyncAt ?? undefined}>
-            {lastSyncLabel(lastSyncAt)}
-          </p>
-
-          {/* Sem rótulo em caixa alta: o ícone diz o que o valor é, e os três
-              fatos cabem numa linha só, então não há coluna pra desalinhar. */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-4 text-sm text-ink-dim">
-            <Fact
-              icon={
-                connection.scope === 'collection' ? (
-                  <FolderClosed aria-hidden className="size-3.5" />
-                ) : (
-                  <Boxes aria-hidden className="size-3.5" />
-                )
-              }
-            >
-              {connection.scope === 'collection' ? 'Uma collection' : 'Project inteiro'}
-            </Fact>
-
-            <Fact
-              icon={
-                readOnly ? (
-                  <Eye aria-hidden className="size-3.5" />
-                ) : (
-                  <PenLine aria-hidden className="size-3.5" />
-                )
-              }
-            >
-              {readOnly ? 'Somente leitura' : 'Leitura e escrita'}
-            </Fact>
-
-            <Fact icon={<KeyRound aria-hidden className="size-3.5" />}>{connection.label}</Fact>
+            {/* Tudo abaixo alinha na mesma sangria do nome do project — a bolinha
+                tem 8px e o gap 8px, então pl-4. É esse prumo que faltava. */}
+            <p className="mt-1 pl-4 text-sm text-ink-faint" title={lastSyncAt ?? undefined}>
+              {lastSyncLabel(lastSyncAt)}
+            </p>
           </div>
+
+          <button
+            onClick={() => void syncNow()}
+            className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
+          >
+            Sincronizar agora
+          </button>
         </div>
 
-        <button
-          onClick={() => void syncNow()}
-          className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
-        >
-          Sincronizar agora
-        </button>
+        {/* Linha própria, e não a coluna que divide espaço com o botão: ali
+            sobravam ~300px e os três fatos quebravam em duas linhas.
+            Sem `flex-wrap` — quem cede é o rótulo da chave, que trunca. */}
+        <div className="flex items-center gap-4 overflow-hidden pl-4 text-sm text-ink-dim">
+          <Fact
+            fixo
+            icon={
+              connection.scope === 'collection' ? (
+                <FolderClosed aria-hidden className="size-3.5" />
+              ) : (
+                <Boxes aria-hidden className="size-3.5" />
+              )
+            }
+          >
+            {connection.scope === 'collection' ? 'Uma collection' : 'Project inteiro'}
+          </Fact>
+
+          <Fact
+            fixo
+            icon={
+              readOnly ? (
+                <Eye aria-hidden className="size-3.5" />
+              ) : (
+                <PenLine aria-hidden className="size-3.5" />
+              )
+            }
+          >
+            {readOnly ? 'Somente leitura' : 'Leitura e escrita'}
+          </Fact>
+
+          <Fact icon={<KeyRound aria-hidden className="size-3.5" />}>{connection.label}</Fact>
+        </div>
       </div>
 
       {readOnly && (
@@ -294,18 +311,19 @@ function Connected() {
               <KeyRound aria-hidden className="size-3.5 shrink-0 text-ink-faint" />
               <span className="min-w-0 flex-1 truncate text-ink">{k.label}</span>
               {k.mine && (
-                <span className="shrink-0 rounded bg-brand-soft px-1.5 py-0.5 text-[10px] text-brand-hi">
+                <span className="shrink-0 rounded bg-brand-soft px-1.5 py-0.5 text-xs text-brand-hi">
                   Esta máquina
                 </span>
               )}
-              <span className="shrink-0 text-[10px] text-ink-faint">
+              <span className="shrink-0 text-xs text-ink-faint">
                 {k.scope === 'collection' ? 'Collection' : 'Project'} ·{' '}
                 {k.role === 'read' ? 'Leitura' : 'Escrita'}
               </span>
-              <span className="shrink-0 text-[10px] text-ink-faint">
-                {k.lastUsedAt
-                  ? `Usada ${new Date(k.lastUsedAt).toLocaleDateString('pt-BR')}`
-                  : 'Nunca usada'}
+              <span
+                className="shrink-0 text-xs text-ink-faint"
+                title={k.lastUsedAt ? 'Último uso desta chave' : 'Esta chave nunca foi usada'}
+              >
+                {k.lastUsedAt ? `Usada ${new Date(k.lastUsedAt).toLocaleDateString('pt-BR')}` : '—'}
               </span>
               {!readOnly && !k.mine && (
                 <button

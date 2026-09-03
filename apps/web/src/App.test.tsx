@@ -400,6 +400,12 @@ describe('painel de sync', () => {
     expect(screen.queryByText('Último sync')).toBeNull()
     expect(container.querySelector('dl')).toBeNull()
 
+    // os três fatos moram na mesma linha: mesmo pai, sem flex-wrap
+    const linha = screen.getByText('Project inteiro').closest('div')!
+    expect(linha.contains(screen.getByText('Leitura e escrita'))).toBe(true)
+    expect(linha.contains(screen.getByText('Esta máquina'))).toBe(true)
+    expect(linha.className).not.toContain('flex-wrap')
+
     vi.unstubAllGlobals()
   })
 

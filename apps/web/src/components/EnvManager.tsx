@@ -21,7 +21,7 @@ function VariableRows({ env }: { env: Environment }) {
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="grid grid-cols-[28px_1fr_1.4fr_58px_28px] items-center gap-2 px-1 text-[10px] tracking-wider text-ink-faint uppercase">
+      <div className="grid grid-cols-[28px_1fr_1.4fr_58px_28px] items-center gap-2 px-1 text-xs tracking-wider text-ink-faint uppercase">
         <span />
         <span>chave</span>
         <span>valor</span>
@@ -174,7 +174,7 @@ export function EnvManager({
         <div className="flex w-60 shrink-0 flex-col border-r border-line bg-app">
           <div className="flex flex-col gap-0.5 px-3 pt-3 pb-1">
             <p
-              className="text-[10px] font-semibold tracking-wider text-ink-faint uppercase"
+              className="text-xs font-semibold tracking-wider text-ink-faint uppercase"
               title="Arraste para reordenar"
             >
               Environments
@@ -253,7 +253,7 @@ export function EnvManager({
                 )}
                 {env.isBase && (
                   <span
-                    className="ml-auto shrink-0 text-[10px] text-ink-faint"
+                    className="ml-auto shrink-0 text-xs text-ink-faint"
                     title="Environment base: aplicado antes do ativo, em todos os outros"
                   >
                     base
@@ -294,7 +294,7 @@ export function EnvManager({
                 {selected.isBase ? (
                   // O base nunca é o ativo, então não tem cor de destaque nem exclusão.
                   <p className="min-w-0 flex-1 text-sm leading-relaxed text-ink-faint">
-                    <span className="mr-1.5 rounded bg-raised px-1.5 py-0.5 text-[10px] text-ink-dim">
+                    <span className="mr-1.5 rounded bg-raised px-1.5 py-0.5 text-xs text-ink-dim">
                       base
                     </span>
                     Variáveis comuns a todos os environments — cada um pode sobrescrevê-las. O nome

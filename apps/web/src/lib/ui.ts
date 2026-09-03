@@ -17,7 +17,7 @@ export const inputClass = `${controlClass} placeholder:text-ink-faint`
  */
 export const selectClass = `${controlClass} cursor-pointer appearance-none pr-8 hover:border-line-soft`
 
-export const fieldLabel = 'text-[10px] font-semibold tracking-wider text-ink-faint uppercase'
+export const fieldLabel = 'text-xs font-semibold tracking-wider text-ink-faint uppercase'
 
 /**
  * Controles do header. Mesma altura `h-9` dos controles de diálogo, pelo mesmo
