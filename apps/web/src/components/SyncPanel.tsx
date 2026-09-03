@@ -6,7 +6,7 @@ import { useStore } from '../store'
 import { useSession } from '../sessionStore'
 import { useConfirm } from '../lib/confirm'
 import { Modal } from './Modal'
-import { fieldLabel as label, inputClass } from '../lib/ui'
+import { fieldLabel as label, headerButton, inputClass } from '../lib/ui'
 
 function useSyncStatus() {
   const [status, setStatus] = useState<SyncStatus>('off')
@@ -309,7 +309,7 @@ export function SyncPanel() {
           repetir os dois é o que fazia o header parecer cheio. */}
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 py-2 text-ink-dim transition hover:bg-raised hover:text-ink"
+        className={headerButton}
         title={STATUS_TITLE[status]}
         aria-label={STATUS_TITLE[status]}
       >

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Boxes, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { bySortOrder, useStore } from '../store'
 import { useConfirm } from '../lib/confirm'
+import { headerGroup, headerGroupBody, headerSelect } from '../lib/ui'
 
 /**
  * Seletor de project no header. Project é o nível acima da collection e a
@@ -23,8 +24,8 @@ export function ProjectSelector() {
   if (!open) return null
 
   return (
-    <div className="flex items-stretch overflow-hidden rounded-md border border-line focus-within:border-brand">
-      <div className="flex items-center gap-2 border-r border-line bg-panel pl-3">
+    <div className={headerGroup}>
+      <div className={headerGroupBody}>
         <Boxes aria-hidden className="size-3.5 shrink-0 text-brand" />
         {editing ? (
           <input
@@ -38,12 +39,12 @@ export function ProjectSelector() {
             className="w-32 rounded bg-app px-1 py-0.5 text-sm font-medium text-ink focus:outline-none focus-visible:outline-none"
           />
         ) : (
-          <div className="relative flex items-center">
+          <div className="relative flex items-center self-stretch">
             <select
               value={open.id}
               onChange={(e) => openProject(e.target.value)}
               onDoubleClick={() => setEditing(true)}
-              className="cursor-pointer appearance-none bg-transparent py-2 pr-7 pl-0 text-sm font-medium text-ink focus:outline-none focus-visible:outline-none"
+              className={headerSelect}
               title="Project aberto — duplo clique para renomear"
             >
               {sorted.map((p) => (

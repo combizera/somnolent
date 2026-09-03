@@ -8,6 +8,7 @@ import {
   useStore,
 } from '../store'
 import { EnvManager } from './EnvManager'
+import { headerGroup, headerGroupBody, headerSelect } from '../lib/ui'
 
 export function EnvSelector() {
   // Environment pertence à collection, então o seletor mostra os da collection
@@ -29,19 +30,19 @@ export function EnvSelector() {
   return (
     // O anel de foco vive na borda do grupo: no <select> ele desenharia só em
     // volta do texto, dentro do grupo, o que fica torto.
-    <div className="flex items-stretch overflow-hidden rounded-md border border-line focus-within:border-brand">
-      <div className="flex items-center gap-2 border-r border-line bg-panel pl-3">
+    <div className={headerGroup}>
+      <div className={headerGroupBody}>
         <span
           className="size-2 shrink-0 rounded-full transition-colors"
           style={{ background: active?.color ?? 'var(--color-ink-faint)' }}
         />
         {/* o chevron é um ícone sobreposto, não background-image: assim segue o tema */}
-        <div className="relative flex items-center">
+        <div className="relative flex items-center self-stretch">
           <select
             value={activeEnvId ?? ''}
             onChange={(e) => collectionId && setActiveEnv(collectionId, e.target.value || null)}
             disabled={!collectionId}
-            className="cursor-pointer appearance-none bg-transparent py-2 pr-7 pl-0 text-sm font-medium text-ink focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:text-ink-faint"
+            className={`${headerSelect} disabled:cursor-not-allowed disabled:text-ink-faint`}
             title={
               collectionId
                 ? 'Environment ativo — troca URL, token e todas as variáveis'

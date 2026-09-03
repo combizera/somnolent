@@ -308,6 +308,20 @@ describe('header', () => {
     expect(botao.textContent).toBe('')
   })
 
+  it('todos os controles da direita fecham na mesma altura', () => {
+    const { container } = render(<App />)
+    const cluster = container.querySelector('header')!.lastElementChild!
+
+    // project · compartilhar · sync · environment
+    expect(cluster.children.length).toBe(4)
+    const alturas = [...cluster.children].map(
+      (el) => el.className.match(/\bh-\d+\b/)?.[0] ?? 'sem altura fixa',
+    )
+    // Sem altura fixa cada controle fecha na métrica do próprio conteúdo — o
+    // select num tamanho, o botão de ícone noutro, a bolinha de status noutro.
+    expect(new Set(alturas)).toEqual(new Set(['h-9']))
+  })
+
   it('o gatilho do sync não repete o nome do project', () => {
     // Sem conexão o gatilho mostraria "Sync" e o teste não provaria nada — o
     // nome só era duplicado quando havia uma chave conectada.

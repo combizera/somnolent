@@ -15,6 +15,7 @@ import { ResizeHandle } from './components/ResizeHandle'
 import { useActiveEnv, useSelectedRequest, useStore } from './store'
 import { useSession } from './sessionStore'
 import { PANE_MIN, SIDEBAR, useLayout } from './layoutStore'
+import { headerButton } from './lib/ui'
 
 /** Largura da coluna de cada divisor, em px. Entra direto no grid abaixo. */
 const HANDLE = 5
@@ -112,7 +113,7 @@ function App() {
             <ProjectSelector />
             <button
               onClick={() => openShare()}
-              className="rounded-md border border-line bg-panel p-2 text-ink-dim transition hover:bg-raised hover:text-ink"
+              className={`${headerButton} w-9 px-0`}
               title="Compartilhar este project"
               aria-label="Compartilhar este project"
             >
