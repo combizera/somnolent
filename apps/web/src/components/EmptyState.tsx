@@ -69,7 +69,7 @@ export function EmptyState() {
     <div
       role="region"
       aria-label="Nenhuma request aberta"
-      className="col-span-2 grid place-items-center overflow-y-auto bg-panel p-8"
+      className="grid place-items-center overflow-y-auto bg-panel p-8"
     >
       <div className="flex w-full max-w-md flex-col gap-6">
         <div className="flex flex-col items-center gap-3 text-center">

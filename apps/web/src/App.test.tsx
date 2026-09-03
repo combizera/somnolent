@@ -456,6 +456,23 @@ describe('redimensionar os painéis', () => {
     restaura()
   })
 
+  it('sem request, a tela vazia ocupa a coluna que sobra — e só ela', () => {
+    useStore.getState().selectRequest(null)
+    const { container } = render(<App />)
+
+    const main = container.querySelector('main')!
+    // sidebar · divisor · tela vazia
+    expect(main.children).toHaveLength(3)
+    expect(main.style.gridTemplateColumns.split(' ')).toHaveLength(3)
+
+    // `col-span-2` sobrou do grid antigo (sidebar + dois painéis, sem divisor):
+    // hoje ele pediria uma 4ª coluna que não existe e o browser inventaria uma
+    // implícita, jogando a tela vazia pra fora do lugar.
+    const vazio = screen.getByRole('region', { name: 'Nenhuma request aberta' })
+    expect(vazio.className).not.toContain('col-span')
+    expect(main.children[2]).toBe(vazio)
+  })
+
   it('a largura entra no grid, não em style de cada painel', () => {
     comRequest()
     const { container } = render(<App />)
