@@ -30,7 +30,24 @@ async function call<T>(
     },
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   })
-  const data = await res.json().catch(() => ({}))
+  const raw = await res.text()
+  let data: { error?: string } = {}
+  if (raw.trim()) {
+    try {
+      data = JSON.parse(raw)
+    } catch {
+      // Resposta não-JSON quase sempre significa API_URL apontando pro lugar
+      // errado — o caso clássico é o próprio domínio da web, cujo nginx
+      // devolve o index.html em qualquer GET e 405 em POST. Sem este ramo, um
+      // 200 com HTML passaria como sucesso de corpo vazio e a falha só
+      // apareceria muito depois, sem pista da causa.
+      const type = res.headers.get('content-type')?.split(';')[0] ?? 'conteúdo desconhecido'
+      throw new ApiError(
+        res.status,
+        `A API respondeu ${res.status} com ${type}, não JSON. Confira se VITE_API_URL aponta pro server do Somnolent — hoje está ${API_URL}.`,
+      )
+    }
+  }
   if (!res.ok) throw new ApiError(res.status, data.error ?? `Erro ${res.status}`)
   return data as T
 }
