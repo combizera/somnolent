@@ -78,13 +78,13 @@ function App() {
   return (
     <ConfirmProvider>
       <div
-          className="flex h-screen flex-col overflow-hidden bg-app text-ink"
+        className="flex h-screen flex-col overflow-hidden bg-app text-ink"
         style={{ '--accent': active?.color ?? 'var(--color-brand)' } as React.CSSProperties}
       >
         {/* faixa fina no topo — o único lugar onde a cor do environment pinta o app */}
-      <div className="h-0.5 shrink-0 transition-colors" style={{ background: envColor }} />
+        <div className="h-0.5 shrink-0 transition-colors" style={{ background: envColor }} />
 
-        <header className="flex h-11 shrink-0 items-center justify-between gap-4 border-b border-line px-3">
+        <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-line px-3">
           <div className="flex items-center gap-1">
             <button
               onClick={goHome}

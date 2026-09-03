@@ -30,7 +30,7 @@ export const headerGroup =
 
 /** Botão solto do header, quadrado, só ícone. */
 export const headerButton =
-  'flex h-9 items-center justify-center gap-1.5 rounded-md border border-line bg-panel px-3 text-ink-dim transition hover:bg-raised hover:text-ink'
+  'flex h-9 items-center justify-center gap-1.5 rounded-md border border-line bg-panel px-2 text-ink-dim transition hover:bg-raised hover:text-ink'
 
 /** Trecho do grupo que abriga ícone + select. O respiro à esquerda é o que
  *  separa o conteúdo da borda do grupo. */
