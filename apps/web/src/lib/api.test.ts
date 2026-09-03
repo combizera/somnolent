@@ -46,6 +46,19 @@ describe('cliente de API contra um endereço que não é a API', () => {
     expect((err as ApiError).message).toBe('Chave inválida ou revogada.')
   })
 
+  it('API fora do ar vira erro que nomeia o endereço, não um "falha" genérico', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    )
+
+    const err = await api.listKeys('somn_x').catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    // sem isto, a tela do sync só dizia "Falha ao listar chaves."
+    expect((err as ApiError).message).toContain('http://localhost:4000')
+    expect((err as ApiError).message).toContain('no ar')
+  })
+
   it('resposta JSON válida passa normalmente', async () => {
     vi.stubGlobal(
       'fetch',

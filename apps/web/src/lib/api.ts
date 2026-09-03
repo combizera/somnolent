@@ -20,16 +20,24 @@ async function call<T>(
     headers?: Record<string, string>
   } = {},
 ): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: options.method ?? 'GET',
-    headers: {
-      // Content-Type só quando há body — Fastify rejeita JSON vazio com 400.
-      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
-      ...options.headers,
-    },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  })
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: options.method ?? 'GET',
+      headers: {
+        // Content-Type só quando há body — Fastify rejeita JSON vazio com 400.
+        ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+        ...options.headers,
+      },
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    })
+  } catch {
+    // `fetch` só rejeita antes de ter resposta: servidor fora do ar, DNS, CORS.
+    // Sem nomear o endereço, cada tela mostrava um "Falha ao ..." genérico e
+    // ninguém descobria que o problema era a API não estar de pé.
+    throw new ApiError(0, `Não consegui falar com a API em ${API_URL}. Ela está no ar?`)
+  }
   const raw = await res.text()
   let data: { error?: string } = {}
   if (raw.trim()) {

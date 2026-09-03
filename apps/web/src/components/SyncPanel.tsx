@@ -287,7 +287,7 @@ function Connected() {
 
       <button
         onClick={disconnect}
-        className="w-fit border-t border-line pt-4 text-sm text-ink-faint transition hover:text-bad"
+        className="w-fit border-t border-line pt-4 text-sm text-ink-faint transition hover:text-bad px-3"
       >
         Desconectar esta máquina
       </button>
@@ -313,7 +313,10 @@ export function SyncPanel() {
         title={STATUS_TITLE[status]}
         aria-label={STATUS_TITLE[status]}
       >
-        <span className={`size-2 rounded-full ${STATUS_DOT[status]}`} />
+        <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[status]}`} />
+        {/* O rótulo fica: uma bolinha sozinha não se anuncia como botão. O que
+            não volta é o nome do project, que já está no seletor ao lado. */}
+        <span className="text-sm">Sync</span>
         {connection.role === 'read' && <Eye aria-hidden className="size-3 text-ink-faint" />}
       </button>
       {open && (
