@@ -161,6 +161,20 @@ function Connect() {
   )
 }
 
+/** "13:35:02" não diz se foi agora ou ontem. Isto diz. */
+function lastSyncLabel(iso: string | null): string {
+  if (!iso) return 'ainda não sincronizou'
+  const date = new Date(iso)
+  const ms = Date.now() - date.getTime()
+  if (ms < 60_000) return 'agora mesmo'
+  const min = Math.floor(ms / 60_000)
+  if (min < 60) return `há ${min} min`
+  const hora = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  return date.toDateString() === new Date().toDateString()
+    ? `hoje às ${hora}`
+    : `${date.toLocaleDateString('pt-BR')} às ${hora}`
+}
+
 /** Conectado: estado, chaves emitidas e o botão de compartilhar. */
 function Connected() {
   const connection = useStore((s) => s.connection)
@@ -186,29 +200,39 @@ function Connected() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start gap-3">
+          <h2 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold text-ink">
             <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[status]}`} />
             <span className="truncate">{connection.projectName}</span>
           </h2>
-          <p className="text-sm text-ink-faint">
-            {connection.scope === 'collection' ? 'Collection' : 'Project'} ·{' '}
-            {readOnly ? 'Leitura' : 'Leitura e Escrita'} · esta chave é{' '}
-            <span className="text-ink-dim">{connection.label}</span>
-          </p>
-          <p className="text-sm text-ink-faint">
-            {lastSyncAt
-              ? `Último sync ${new Date(lastSyncAt).toLocaleTimeString('pt-BR')}`
-              : 'Ainda não sincronizou'}
-          </p>
+          <button
+            onClick={() => void syncNow()}
+            className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
+          >
+            Sincronizar agora
+          </button>
         </div>
-        <button
-          onClick={() => void syncNow()}
-          className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
-        >
-          Sincronizar agora
-        </button>
+
+        {/* Uma frase corrida com três fatos separados por · obrigava a decorar a
+            ordem pra entender o que era o quê. Cada fato agora tem rótulo. */}
+        <dl className="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-2 text-sm">
+          <dt className={label}>Compartilhado</dt>
+          <dd className="text-ink">
+            {connection.scope === 'collection' ? 'Uma collection' : 'O project inteiro'}
+          </dd>
+
+          <dt className={label}>Você pode</dt>
+          <dd className="text-ink">{readOnly ? 'Só ler' : 'Ler e escrever'}</dd>
+
+          <dt className={label}>Sua chave</dt>
+          <dd className="truncate text-ink">{connection.label}</dd>
+
+          <dt className={label}>Último sync</dt>
+          <dd className="text-ink" title={lastSyncAt ?? undefined}>
+            {lastSyncLabel(lastSyncAt)}
+          </dd>
+        </dl>
       </div>
 
       {readOnly && (
@@ -232,7 +256,9 @@ function Connected() {
         <p className={label}>Chaves ativas</p>
         {keys === null && <p className="text-sm text-ink-faint">Carregando…</p>}
         {keys?.length === 0 && <p className="text-sm text-ink-faint">Nenhuma chave ainda.</p>}
-        <div className="flex flex-col gap-1">
+        {/* Teto + scroll: um project com muitas chaves empurrava o botão de
+            desconectar pra fora do modal. */}
+        <div className="flex max-h-56 flex-col gap-1 overflow-y-auto pr-1">
           {keys?.map((k) => (
             <div
               key={k.id}
@@ -285,12 +311,23 @@ function Connected() {
 
       {error && <p className="text-sm text-bad">{error}</p>}
 
-      <button
-        onClick={disconnect}
-        className="w-fit border-t border-line pt-4 text-sm text-ink-faint transition hover:text-bad px-3"
-      >
-        Desconectar esta máquina
-      </button>
+      <div className="border-t border-line pt-4">
+        <button
+          onClick={async () => {
+            const ok = await confirm({
+              title: 'Desconectar esta máquina?',
+              message:
+                'As collections continuam aqui, mas param de sincronizar. A chave é esquecida nesta máquina — para voltar você precisa dela de novo, e ela não é mostrada outra vez.',
+              confirmLabel: 'Desconectar',
+              danger: true,
+            })
+            if (ok) disconnect()
+          }}
+          className="w-full rounded-md border border-line px-3 py-2.5 text-sm font-medium text-ink-dim transition hover:border-bad/40 hover:bg-bad/10 hover:text-bad"
+        >
+          Desconectar esta máquina
+        </button>
+      </div>
     </div>
   )
 }
