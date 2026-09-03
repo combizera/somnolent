@@ -30,7 +30,7 @@ export function EnvSelector() {
     // O anel de foco vive na borda do grupo: no <select> ele desenharia só em
     // volta do texto, dentro do grupo, o que fica torto.
     <div className="flex items-stretch overflow-hidden rounded-md border border-line focus-within:border-brand">
-      <div className="flex items-center gap-2 border-r border-line bg-panel pl-2.5">
+      <div className="flex items-center gap-2 border-r border-line bg-panel pl-3">
         <span
           className="size-2 shrink-0 rounded-full transition-colors"
           style={{ background: active?.color ?? 'var(--color-ink-faint)' }}
@@ -41,7 +41,7 @@ export function EnvSelector() {
             value={activeEnvId ?? ''}
             onChange={(e) => collectionId && setActiveEnv(collectionId, e.target.value || null)}
             disabled={!collectionId}
-            className="cursor-pointer appearance-none bg-transparent py-1.5 pr-6 pl-0 text-sm font-medium text-ink focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:text-ink-faint"
+            className="cursor-pointer appearance-none bg-transparent py-2 pr-7 pl-0 text-sm font-medium text-ink focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:text-ink-faint"
             title={
               collectionId
                 ? 'Environment ativo — troca URL, token e todas as variáveis'
@@ -59,7 +59,7 @@ export function EnvSelector() {
           </select>
           <ChevronDown
             aria-hidden
-            className="pointer-events-none absolute right-1.5 size-3 text-ink-faint"
+            className="pointer-events-none absolute right-2 size-3 text-ink-faint"
           />
         </div>
       </div>

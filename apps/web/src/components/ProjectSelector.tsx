@@ -24,7 +24,7 @@ export function ProjectSelector() {
 
   return (
     <div className="flex items-stretch overflow-hidden rounded-md border border-line focus-within:border-brand">
-      <div className="flex items-center gap-2 border-r border-line bg-panel pl-2.5">
+      <div className="flex items-center gap-2 border-r border-line bg-panel pl-3">
         <Boxes aria-hidden className="size-3.5 shrink-0 text-brand" />
         {editing ? (
           <input
@@ -43,7 +43,7 @@ export function ProjectSelector() {
               value={open.id}
               onChange={(e) => openProject(e.target.value)}
               onDoubleClick={() => setEditing(true)}
-              className="cursor-pointer appearance-none bg-transparent py-1.5 pr-6 pl-0 text-sm font-medium text-ink focus:outline-none focus-visible:outline-none"
+              className="cursor-pointer appearance-none bg-transparent py-2 pr-7 pl-0 text-sm font-medium text-ink focus:outline-none focus-visible:outline-none"
               title="Project aberto — duplo clique para renomear"
             >
               {sorted.map((p) => (
@@ -54,7 +54,7 @@ export function ProjectSelector() {
             </select>
             <ChevronDown
               aria-hidden
-              className="pointer-events-none absolute right-1.5 size-3 text-ink-faint"
+              className="pointer-events-none absolute right-2 size-3 text-ink-faint"
             />
           </div>
         )}

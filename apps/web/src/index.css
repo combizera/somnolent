@@ -106,10 +106,16 @@ body {
   background: rgba(124, 92, 255, 0.06) !important;
 }
 
-/* foco visível e consistente em toda a UI */
-:focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 1px;
+/* Foco visível e consistente em toda a UI.
+   Dentro de @layer base de propósito: regra sem layer vence utility em layer
+   independente de especificidade, e fora daqui nenhum `focus-visible:outline-none`
+   conseguiria desligar este anel — era o que desenhava uma borda solta em volta
+   do texto dos <select> dentro dos grupos com borda. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 1px;
+  }
 }
 
 /* o Tailwind v4 não dá cursor: pointer pra botão — tudo que clica, clica */
@@ -158,4 +164,5 @@ body.is-dragging * {
 select option {
   background: var(--color-raised);
   color: var(--color-ink);
+  padding: 6px 10px;
 }
