@@ -10,13 +10,21 @@ import { CommandPalette } from './components/CommandPalette'
 import { ConfirmProvider } from './components/ConfirmDialog'
 import { RequestPanel } from './components/RequestPanel'
 import { ResponsePanel } from './components/ResponsePanel'
-import { useActiveEnv, useSelectedRequest } from './store'
+import { useActiveEnv, useSelectedRequest, useStore } from './store'
 import { useSession } from './sessionStore'
 
 function App() {
   const active = useActiveEnv()
   const request = useSelectedRequest()
   const openShare = useSession((s) => s.openShare)
+  const selectRequest = useStore((s) => s.selectRequest)
+  const openCollection = useStore((s) => s.openCollection)
+
+  /** Logo é o "início": fecha a request e volta pra lista de collections. */
+  const goHome = () => {
+    selectRequest(null)
+    openCollection(null)
+  }
   // Cor do environment: sinal de contexto, não cor de interface.
   const envColor = active?.color ?? 'transparent'
 
@@ -30,35 +38,39 @@ function App() {
       <div className="h-0.5 shrink-0 transition-colors" style={{ background: envColor }} />
 
         <header className="flex h-11 shrink-0 items-center justify-between gap-4 border-b border-line px-3">
-          <div className="flex items-center gap-2">
-            <Logo className="size-5 shrink-0" />
-            <span className="text-sm font-semibold">Somnolent</span>
-          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={goHome}
+              className="flex items-center gap-2 rounded-md px-1.5 py-1 transition hover:bg-raised"
+              title="Voltar para o início"
+            >
+              <Logo className="size-5 shrink-0" />
+              <span className="text-sm font-semibold">Somnolent</span>
+            </button>
 
-          <button
-            onClick={() => {
-              window.dispatchEvent(
-                new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
-              )
-            }}
-            className="hidden min-w-64 items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-sm text-ink-faint transition hover:border-line hover:bg-raised md:flex"
-          >
-            <Search aria-hidden className="size-3.5 shrink-0" />
-            <span className="flex-1 text-left">Buscar request…</span>
-            <kbd className="rounded border border-line bg-app px-1.5 py-px font-mono text-[10px]">
-              Ctrl K
-            </kbd>
-          </button>
+            <button
+              onClick={() => {
+                window.dispatchEvent(
+                  new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
+                )
+              }}
+              className="rounded-md p-2 text-ink-faint transition hover:bg-raised hover:text-ink"
+              title="Buscar request (Ctrl K)"
+              aria-label="Buscar request"
+            >
+              <Search aria-hidden className="size-4" />
+            </button>
+          </div>
 
           <div className="flex items-center gap-2">
             <ProjectSelector />
             <button
               onClick={() => openShare()}
-              className="flex items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
+              className="rounded-md border border-line bg-panel p-2 text-ink-dim transition hover:bg-raised hover:text-ink"
               title="Compartilhar este project"
+              aria-label="Compartilhar este project"
             >
               <Share2 aria-hidden className="size-3.5" />
-              Compartilhar
             </button>
             <SyncPanel />
             <EnvSelector />

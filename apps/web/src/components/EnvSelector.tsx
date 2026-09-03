@@ -27,7 +27,9 @@ export function EnvSelector() {
   )
 
   return (
-    <div className="flex items-stretch overflow-hidden rounded-md border border-line">
+    // O anel de foco vive na borda do grupo: no <select> ele desenharia só em
+    // volta do texto, dentro do grupo, o que fica torto.
+    <div className="flex items-stretch overflow-hidden rounded-md border border-line focus-within:border-brand">
       <div className="flex items-center gap-2 border-r border-line bg-panel pl-2.5">
         <span
           className="size-2 shrink-0 rounded-full transition-colors"
@@ -39,14 +41,16 @@ export function EnvSelector() {
             value={activeEnvId ?? ''}
             onChange={(e) => collectionId && setActiveEnv(collectionId, e.target.value || null)}
             disabled={!collectionId}
-            className="cursor-pointer appearance-none bg-transparent py-1.5 pr-6 pl-0 text-sm font-medium text-ink focus:outline-none disabled:cursor-not-allowed disabled:text-ink-faint"
+            className="cursor-pointer appearance-none bg-transparent py-1.5 pr-6 pl-0 text-sm font-medium text-ink focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:text-ink-faint"
             title={
               collectionId
                 ? 'Environment ativo — troca URL, token e todas as variáveis'
                 : 'Abra uma request para escolher o environment da collection dela'
             }
           >
-            <option value="">{collectionId ? 'Sem environment' : 'Sem collection'}</option>
+            {/* Sem env escolhido, valem só as variáveis do base — então o
+                rótulo honesto é "Base", não uma negação. */}
+            <option value="">{collectionId ? 'Base' : 'Sem collection'}</option>
             {switchable.map((env) => (
               <option key={env.id} value={env.id}>
                 {env.name}
@@ -62,11 +66,11 @@ export function EnvSelector() {
       <button
         onClick={() => setManaging(true)}
         disabled={!collectionId}
-        className="flex items-center gap-1.5 bg-panel px-2.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
+        className="bg-panel px-2 text-ink-dim transition hover:bg-raised hover:text-ink disabled:cursor-not-allowed disabled:text-ink-faint"
         title="Gerenciar environments e variáveis"
+        aria-label="Gerenciar environments e variáveis"
       >
         <SlidersHorizontal className="size-3.5" />
-        Gerenciar
       </button>
       {managing && collectionId && (
         <EnvManager

@@ -19,6 +19,14 @@ function useSyncStatus() {
   return status
 }
 
+/** O botão perdeu o texto, então o estado precisa estar no title. */
+const STATUS_TITLE: Record<SyncStatus, string> = {
+  off: 'Sync desligado — clique para conectar',
+  syncing: 'Sincronizando…',
+  ok: 'Sync em dia — clique para ver e compartilhar',
+  error: 'Sync com erro — clique para ver',
+}
+
 const STATUS_DOT: Record<SyncStatus, string> = {
   off: 'bg-ink-faint',
   syncing: 'bg-info animate-pulse',
@@ -297,16 +305,16 @@ export function SyncPanel() {
 
   return (
     <>
+      {/* Só o estado: o nome do project já está no ProjectSelector ao lado, e
+          repetir os dois é o que fazia o header parecer cheio. */}
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
-        title="Sync e compartilhamento"
+        className="flex items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 py-2 text-ink-dim transition hover:bg-raised hover:text-ink"
+        title={STATUS_TITLE[status]}
+        aria-label={STATUS_TITLE[status]}
       >
         <span className={`size-2 rounded-full ${STATUS_DOT[status]}`} />
-        {connection.key ? connection.projectName : 'Sync'}
-        {connection.role === 'read' && (
-          <Eye aria-hidden className="size-3 text-ink-faint" />
-        )}
+        {connection.role === 'read' && <Eye aria-hidden className="size-3 text-ink-faint" />}
       </button>
       {open && (
         <Modal onClose={() => setOpen(false)}>{connection.key ? <Connected /> : <Connect />}</Modal>

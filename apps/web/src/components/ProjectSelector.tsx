@@ -23,7 +23,7 @@ export function ProjectSelector() {
   if (!open) return null
 
   return (
-    <div className="flex items-stretch overflow-hidden rounded-md border border-line">
+    <div className="flex items-stretch overflow-hidden rounded-md border border-line focus-within:border-brand">
       <div className="flex items-center gap-2 border-r border-line bg-panel pl-2.5">
         <Boxes aria-hidden className="size-3.5 shrink-0 text-brand" />
         {editing ? (
@@ -35,7 +35,7 @@ export function ProjectSelector() {
               setEditing(false)
             }}
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-            className="w-32 rounded bg-app px-1 py-0.5 text-sm font-medium text-ink focus:outline-none"
+            className="w-32 rounded bg-app px-1 py-0.5 text-sm font-medium text-ink focus:outline-none focus-visible:outline-none"
           />
         ) : (
           <div className="relative flex items-center">
@@ -43,7 +43,7 @@ export function ProjectSelector() {
               value={open.id}
               onChange={(e) => openProject(e.target.value)}
               onDoubleClick={() => setEditing(true)}
-              className="cursor-pointer appearance-none bg-transparent py-1.5 pr-6 pl-0 text-sm font-medium text-ink focus:outline-none"
+              className="cursor-pointer appearance-none bg-transparent py-1.5 pr-6 pl-0 text-sm font-medium text-ink focus:outline-none focus-visible:outline-none"
               title="Project aberto — duplo clique para renomear"
             >
               {sorted.map((p) => (

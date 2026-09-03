@@ -273,6 +273,81 @@ describe('response de JSON grande', () => {
   })
 })
 
+describe('header', () => {
+  it('o logo volta pro início: fecha a request e a collection', () => {
+    const s = useStore.getState()
+    const collection = s.collections.find((c) => c.parentId === null)!
+    s.openCollection(collection.id)
+    s.selectRequest(s.requests[0]!.id)
+
+    render(<App />)
+    fireEvent.click(screen.getByTitle('Voltar para o início'))
+
+    expect(useStore.getState().selectedRequestId).toBeNull()
+    expect(useStore.getState().openCollectionId).toBeNull()
+  })
+
+  it('a busca é só ícone e abre a paleta ao clicar', () => {
+    render(<App />)
+    // nenhum texto de busca ocupando o header
+    expect(screen.queryByText('Buscar request…')).toBeNull()
+
+    const botao = screen.getByRole('button', { name: 'Buscar request' })
+    expect(botao.textContent).toBe('')
+
+    fireEvent.click(botao)
+    expect(screen.getByPlaceholderText(/Buscar request por nome/)).toBeDefined()
+  })
+
+  it('compartilhar é só ícone, mas continua anunciado', () => {
+    render(<App />)
+    const botao = screen.getByRole('button', { name: 'Compartilhar este project' })
+    expect(botao.textContent).toBe('')
+  })
+
+  it('o gatilho do sync não repete o nome do project', () => {
+    // Sem conexão o gatilho mostraria "Sync" e o teste não provaria nada — o
+    // nome só era duplicado quando havia uma chave conectada.
+    const project = useStore.getState().projects[0]!
+    useStore.setState({
+      connection: {
+        key: 'somn_x',
+        scope: 'project',
+        role: 'write',
+        label: 'meu Mac',
+        projectId: project.id,
+        projectName: project.name,
+        collectionId: null,
+      },
+    })
+
+    render(<App />)
+    // o nome aparece uma vez só, no seletor de project
+    expect(screen.queryAllByText(project.name)).toHaveLength(1)
+  })
+
+  it('sem environment escolhido o rótulo é "Base", não uma negação', () => {
+    const s = useStore.getState()
+    s.selectRequest(s.requests[0]!.id)
+
+    render(<App />)
+    expect(screen.queryByText('Sem environment')).toBeNull()
+    expect(screen.getByRole('option', { name: 'Base' })).toBeDefined()
+  })
+
+  it('o foco do seletor de env pinta a borda do grupo, não o select', () => {
+    const s = useStore.getState()
+    s.selectRequest(s.requests[0]!.id)
+
+    const { container } = render(<App />)
+    const select = container.querySelector('select[title^="Environment ativo"]')!
+    // o select não desenha anel próprio...
+    expect(select.className).toContain('focus-visible:outline-none')
+    // ...e o grupo em volta é quem reage ao foco
+    expect(select.closest('div.rounded-md')!.className).toContain('focus-within:border-brand')
+  })
+})
+
 describe('arrastar request', () => {
   /** dataTransfer mínimo: o jsdom não fornece um. */
   const dt = () => ({ setData: () => {}, getData: () => '', effectAllowed: '', dropEffect: '' })
