@@ -10,6 +10,7 @@ import { ShareDialog } from './components/ShareDialog'
 import { CommandPalette } from './components/CommandPalette'
 import { ConfirmProvider } from './components/ConfirmDialog'
 import { RequestPanel } from './components/RequestPanel'
+import { TabStrip } from './components/TabStrip'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResizeHandle } from './components/ResizeHandle'
 import { useActiveEnv, useSelectedRequest, useStore } from './store'
@@ -129,16 +130,22 @@ function App() {
 
         <main
           ref={main}
-          className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
+          className="grid min-h-0 flex-1"
           style={{
-            gridTemplateColumns: request
-              ? `${sidebarWidth}px ${HANDLE}px minmax(0,${requestSplit}fr) ${HANDLE}px minmax(0,${1 - requestSplit}fr)`
-              : `${sidebarWidth}px ${HANDLE}px minmax(0,1fr)`,
+            // Duas linhas: a barra de abas em cima, os painéis embaixo. A
+            // largura da sidebar é a única coluna que muda — a divisão entre
+            // request e response virou grid interno, então este template não
+            // depende mais de haver request aberta.
+            gridTemplateRows: 'auto minmax(0,1fr)',
+            gridTemplateColumns: `${sidebarWidth}px ${HANDLE}px minmax(0,1fr)`,
           }}
         >
-          <Sidebar />
+          <div style={{ gridRow: '1 / span 2' }} className="grid min-h-0 overflow-hidden">
+            <Sidebar />
+          </div>
           <ResizeHandle
             label="Largura da sidebar"
+            style={{ gridRow: '1 / span 2' }}
             onDrag={(clientX) => {
               const box = main.current?.getBoundingClientRect()
               if (box) applySidebar(clientX - box.left)
@@ -146,32 +153,49 @@ function App() {
             onStep={(delta) => applySidebar(sidebarWidth + delta)}
             onReset={resetSidebar}
           />
-          {request ? (
-            <>
-              <RequestPanel key={request.id} request={request} />
-              <ResizeHandle
-                label="Divisão entre request e response"
-                onDrag={(clientX) => {
-                  const area = paneArea()
-                  // Sem o teste de `available`, uma janela degenerada dividiria
-                  // por zero e gravaria NaN na fração.
-                  if (area && area.available > 0) {
-                    applySplit((clientX - area.left - sidebarWidth - HANDLE) / area.available)
-                  }
-                }}
-                onStep={(delta) => {
-                  const area = paneArea()
-                  if (area && area.available > 0) {
-                    applySplit(requestSplit + delta / area.available)
-                  }
-                }}
-                onReset={resetSplit}
-              />
-              <ResponsePanel key={`res-${request.id}`} requestId={request.id} />
-            </>
-          ) : (
-            <EmptyState />
-          )}
+
+          <TabStrip style={{ gridColumn: 3, gridRow: 1 }} />
+
+          <div
+            className="grid min-h-0"
+            style={{
+              // Linha e coluna explícitas: a barra de abas não renderiza quando
+              // não há aba, e no auto-placement os painéis subiriam pra linha 1
+              // — que é `auto` e os deixaria com a altura do conteúdo.
+              gridColumn: 3,
+              gridRow: 2,
+              gridTemplateColumns: request
+                ? `minmax(0,${requestSplit}fr) ${HANDLE}px minmax(0,${1 - requestSplit}fr)`
+                : 'minmax(0,1fr)',
+            }}
+          >
+            {request ? (
+              <>
+                <RequestPanel key={request.id} request={request} />
+                <ResizeHandle
+                  label="Divisão entre request e response"
+                  onDrag={(clientX) => {
+                    const area = paneArea()
+                    // Sem o teste de `available`, uma janela degenerada dividiria
+                    // por zero e gravaria NaN na fração.
+                    if (area && area.available > 0) {
+                      applySplit((clientX - area.left - sidebarWidth - HANDLE) / area.available)
+                    }
+                  }}
+                  onStep={(delta) => {
+                    const area = paneArea()
+                    if (area && area.available > 0) {
+                      applySplit(requestSplit + delta / area.available)
+                    }
+                  }}
+                  onReset={resetSplit}
+                />
+                <ResponsePanel key={`res-${request.id}`} requestId={request.id} />
+              </>
+            ) : (
+              <EmptyState />
+            )}
+          </div>
         </main>
       </div>
     </ConfirmProvider>

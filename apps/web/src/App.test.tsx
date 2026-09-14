@@ -532,16 +532,26 @@ describe('redimensionar os painéis', () => {
     const { container } = render(<App />)
 
     const main = container.querySelector('main')!
-    // sidebar · divisor · tela vazia
+    // sidebar · divisor · painéis. A barra de abas não renderiza sem aba, e é
+    // justamente por isso que os painéis não podem contar com auto-placement.
     expect(main.children).toHaveLength(3)
     expect(main.style.gridTemplateColumns.split(' ')).toHaveLength(3)
+    expect(screen.queryByRole('tablist')).toBeNull()
 
     // `col-span-2` sobrou do grid antigo (sidebar + dois painéis, sem divisor):
     // hoje ele pediria uma 4ª coluna que não existe e o browser inventaria uma
     // implícita, jogando a tela vazia pra fora do lugar.
     const vazio = screen.getByRole('region', { name: 'Nenhuma request aberta' })
     expect(vazio.className).not.toContain('col-span')
-    expect(main.children[2]).toBe(vazio)
+
+    // Os painéis são a 3ª célula, presos na linha 2. Sem a linha explícita eles
+    // subiriam pra linha da barra — que é `auto` — e ficariam com a altura do
+    // conteúdo em vez da altura da janela.
+    const paineis = main.children[2] as HTMLElement
+    expect(paineis.style.gridColumn).toBe('3')
+    expect(paineis.style.gridRow).toBe('2')
+    expect(paineis.children).toHaveLength(1)
+    expect(paineis.children[0]).toBe(vazio)
   })
 
   it('a largura entra no grid, não em style de cada painel', () => {
@@ -549,8 +559,11 @@ describe('redimensionar os painéis', () => {
     const { container } = render(<App />)
     const main = container.querySelector('main')!
     expect(main.style.gridTemplateColumns).toContain(`${SIDEBAR.default}px`)
-    // duas colunas de 5px: os dois divisores
-    expect(main.style.gridTemplateColumns.match(/5px/g)).toHaveLength(2)
+    // Um divisor por grid: o da sidebar no de fora, o de request/response no de
+    // dentro. Os dois continuam sendo coluna de 5px, e não style de painel.
+    expect(main.style.gridTemplateColumns.match(/5px/g)).toHaveLength(1)
+    const paineis = main.children[3] as HTMLElement
+    expect(paineis.style.gridTemplateColumns.match(/5px/g)).toHaveLength(1)
   })
 })
 
@@ -706,5 +719,164 @@ describe('tela vazia e exclusão', () => {
 
     expect(screen.queryByRole('alertdialog')).toBeNull()
     expect(useStore.getState().collections.some((c) => c.id === collection.id)).toBe(true)
+  })
+})
+
+describe('barra de abas', () => {
+  /** Três requests na collection do seed, todas abertas em aba. */
+  function tresAbas() {
+    const s = useStore.getState()
+    const collectionId = s.collections[0]!.id
+    const projectId = s.openProjectId!
+    const ids = ['t1', 't2', 't3']
+    useStore.setState((st) => ({
+      requests: [
+        ...st.requests,
+        ...ids.map((id) => ({
+          ...st.requests[0]!,
+          id,
+          projectId,
+          collectionId,
+          name: `Aba ${id}`,
+        })),
+      ],
+    }))
+    ids.forEach((id) => useStore.getState().selectRequest(id))
+    return ids
+  }
+
+  it('mostra uma aba por request aberta, com a ativa marcada', () => {
+    tresAbas()
+    render(<App />)
+
+    const abas = screen.getAllByRole('tab')
+    expect(abas.map((a) => a.textContent)).toEqual([
+      expect.stringContaining('Aba t1'),
+      expect.stringContaining('Aba t2'),
+      expect.stringContaining('Aba t3'),
+    ])
+    expect(abas[2]!.getAttribute('aria-selected')).toBe('true')
+    expect(abas[0]!.getAttribute('aria-selected')).toBe('false')
+  })
+
+  it('clicar numa aba troca a request aberta', () => {
+    tresAbas()
+    render(<App />)
+
+    fireEvent.click(screen.getAllByRole('tab')[0]!)
+
+    expect(useStore.getState().selectedRequestId).toBe('t1')
+  })
+
+  it('o X da aba fecha só ela', () => {
+    tresAbas()
+    render(<App />)
+
+    fireEvent.click(screen.getByLabelText('Fechar Aba t1'))
+
+    expect(useStore.getState().openTabs).toEqual(['t2', 't3'])
+  })
+
+  it('botão do meio fecha a aba', () => {
+    tresAbas()
+    render(<App />)
+
+    // `fireEvent.auxClick` não existe nesta versão do RTL; o evento nativo vai.
+    fireEvent(
+      screen.getAllByRole('tab')[0]!,
+      new MouseEvent('auxclick', { bubbles: true, button: 1 }),
+    )
+
+    expect(useStore.getState().openTabs).toEqual(['t2', 't3'])
+  })
+
+  it('o direito na aba abre o menu com as três ações', () => {
+    tresAbas()
+    render(<App />)
+
+    fireEvent.contextMenu(screen.getAllByRole('tab')[0]!, { clientX: 40, clientY: 20 })
+
+    const menu = screen.getByRole('menu')
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
+      'Fechar',
+      'Fechar as outras',
+      'Fechar todas',
+    ])
+  })
+
+  it('"fechar as outras" deixa só a que recebeu o clique', () => {
+    tresAbas()
+    render(<App />)
+
+    fireEvent.contextMenu(screen.getAllByRole('tab')[0]!, { clientX: 40, clientY: 20 })
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Fechar as outras' }))
+
+    expect(useStore.getState().openTabs).toEqual(['t1'])
+    expect(useStore.getState().selectedRequestId).toBe('t1')
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('"fechar todas" limpa a barra e ela desaparece', () => {
+    tresAbas()
+    render(<App />)
+
+    fireEvent.contextMenu(screen.getAllByRole('tab')[1]!, { clientX: 40, clientY: 20 })
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Fechar todas' }))
+
+    expect(useStore.getState().openTabs).toEqual([])
+    expect(screen.queryByRole('tablist')).toBeNull()
+  })
+
+  it('com uma aba só, o menu não oferece "fechar as outras"', () => {
+    tresAbas()
+    useStore.getState().closeOtherTabs('t2')
+    render(<App />)
+
+    fireEvent.contextMenu(screen.getAllByRole('tab')[0]!, { clientX: 40, clientY: 20 })
+
+    expect(screen.queryByRole('menuitem', { name: 'Fechar as outras' })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: 'Fechar' })).toBeDefined()
+  })
+
+  it('o direito no vazio da barra só oferece "fechar todas"', () => {
+    tresAbas()
+    render(<App />)
+
+    fireEvent.contextMenu(screen.getByRole('tablist'), { clientX: 400, clientY: 20 })
+
+    const itens = within(screen.getByRole('menu')).getAllByRole('menuitem')
+    expect(itens.map((i) => i.textContent)).toEqual(['Fechar todas'])
+  })
+
+  it('Esc fecha o menu sem fechar aba', () => {
+    tresAbas()
+    render(<App />)
+
+    fireEvent.contextMenu(screen.getAllByRole('tab')[0]!, { clientX: 40, clientY: 20 })
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(useStore.getState().openTabs).toHaveLength(3)
+  })
+
+  it('a barra só mostra as abas da collection em contexto', () => {
+    tresAbas()
+    const s = useStore.getState()
+    const outra = s.addCollection('Outra')
+    useStore.setState((st) => ({
+      requests: [
+        ...st.requests,
+        { ...st.requests[0]!, id: 'z1', collectionId: outra, name: 'De outra' },
+      ],
+    }))
+    useStore.getState().selectRequest('z1')
+
+    render(<App />)
+
+    // as quatro abas existem no estado, mas a barra é de uma collection só
+    expect(useStore.getState().openTabs).toHaveLength(4)
+    expect(screen.getAllByRole('tab').map((a) => a.textContent)).toEqual([
+      expect.stringContaining('De outra'),
+    ])
   })
 })

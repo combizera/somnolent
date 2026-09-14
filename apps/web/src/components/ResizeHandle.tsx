@@ -9,6 +9,8 @@ interface Props {
   onStep: (deltaPx: number) => void
   /** Duplo clique volta ao default. */
   onReset: () => void
+  /** Posição no grid de quem usa — o divisor não sabe onde ele mora. */
+  style?: React.CSSProperties
 }
 
 /** Passo do teclado; com Shift anda mais rápido. */
@@ -20,7 +22,7 @@ const STEP_FAST = 64
  * precisa de posicionamento absoluto nem de cálculo de offset — a área de
  * clique é a coluna inteira, e o traço visível é o ::after de 1px.
  */
-export function ResizeHandle({ label, onDrag, onStep, onReset }: Props) {
+export function ResizeHandle({ label, onDrag, onStep, onReset, style }: Props) {
   const dragging = useRef(false)
 
   // Desmontar no meio do arraste (trocar de request, por exemplo) nunca dispara
@@ -39,6 +41,7 @@ export function ResizeHandle({ label, onDrag, onStep, onReset }: Props) {
       aria-orientation="vertical"
       aria-label={label}
       tabIndex={0}
+      style={style}
       onPointerDown={(e) => {
         // Só botão principal: com o direito o menu de contexto rouba o pointerup.
         if (e.button !== 0) return
