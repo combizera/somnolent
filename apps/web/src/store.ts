@@ -32,6 +32,67 @@ const MAX_HISTORY_PER_REQUEST = 20
 const MAX_HISTORY_BODY = 100_000
 
 /**
+ * Teto de abas POR collection, não global: a barra mostra uma collection por
+ * vez, então o teto de uma não pode comer as abas da outra.
+ */
+export const MAX_TABS_PER_COLLECTION = 10
+
+/** O que basta pra saber quais abas aparecem e sob qual collection. */
+interface TabContext {
+  collections: Collection[]
+  requests: ApiRequest[]
+  selectedRequestId: string | null
+  openCollectionId: string | null
+}
+
+/**
+ * Collection raiz de uma request — é por ela que a barra recorta as abas.
+ * `null` cobre dois casos de uma vez: request que não existe mais e request
+ * fora de collection. Nenhum dos dois aparece com uma collection aberta.
+ */
+function tabScope(
+  collections: Collection[],
+  requests: ApiRequest[],
+  requestId: string,
+): string | null {
+  const request = requests.find((r) => r.id === requestId)
+  if (!request) return null
+  return rootCollectionOf(collections, request.collectionId)?.id ?? null
+}
+
+/**
+ * Collection que a barra está mostrando. Mesma regra do contexto de variáveis
+ * (`useContextCollectionId`) de propósito: a barra e o environment ativo têm
+ * que concordar sobre onde a pessoa está, senão clicar numa aba trocaria o
+ * environment sem trocar a barra.
+ */
+function openScope(s: TabContext): string | null {
+  const selected = s.requests.find((r) => r.id === s.selectedRequestId)
+  return rootCollectionOf(s.collections, selected?.collectionId ?? s.openCollectionId)?.id ?? null
+}
+
+/**
+ * Abre a aba de uma request à direita das que já estão. Passou do teto, sai a
+ * mais antiga DA MESMA collection: a ordem na barra não se mexe sozinha, e
+ * reabrir é um clique na sidebar.
+ */
+function withTab(
+  tabs: string[],
+  collections: Collection[],
+  requests: ApiRequest[],
+  requestId: string,
+): string[] {
+  if (tabs.includes(requestId)) return tabs
+  const scope = tabScope(collections, requests, requestId)
+  const next = [...tabs, requestId]
+  const sameScope = next.filter((id) => tabScope(collections, requests, id) === scope)
+  const excess = sameScope.length - MAX_TABS_PER_COLLECTION
+  if (excess <= 0) return next
+  const evicted = new Set(sameScope.slice(0, excess))
+  return next.filter((id) => !evicted.has(id))
+}
+
+/**
  * A ordem da sidebar vive em `sortOrder`, não na ordem do array: o sync manda
  * cada entidade por conta própria, então a posição precisa viajar com ela.
  */
@@ -195,6 +256,13 @@ interface AppState {
    * Array, não Set: o persist serializa em JSON e Set viraria `{}`.
    */
   expandedFolders: string[]
+  /**
+   * Requests abertas na barra de abas, em ordem de posição — a mais recente
+   * entra à direita. Escolha local de navegação: não sincroniza, como o
+   * `openCollectionId` e o `expandedFolders`.
+   * Array, não Set, pelo mesmo motivo: o persist serializa em JSON.
+   */
+  openTabs: string[]
   history: Record<string, HistoryEntry[]>
 
   /**
@@ -253,6 +321,13 @@ interface AppState {
   deleteRequest: (id: string) => void
   duplicateRequest: (id: string) => void
   selectRequest: (id: string | null) => void
+  /** Abre (ou traz pra frente) a aba de uma request e a seleciona. */
+  openTab: (id: string) => void
+  closeTab: (id: string) => void
+  /** Fecha as outras abas DA MESMA collection e deixa esta ativa. */
+  closeOtherTabs: (id: string) => void
+  /** Fecha todas as abas da collection em contexto. */
+  closeAllTabs: () => void
   /** Move uma request para uma pasta (ou raiz) na posição indicada. */
   moveRequest: (id: string, collectionId: string | null, index: number) => void
   /** Reordena uma pasta entre as outras. */
@@ -280,6 +355,7 @@ export const useStore = create<AppState>()(
       history: {},
       openCollectionId: null,
       expandedFolders: [],
+      openTabs: [],
       ...seed(),
 
       connection: NO_CONNECTION,
@@ -393,6 +469,7 @@ export const useStore = create<AppState>()(
             ),
             selectedRequestId: null,
             openCollectionId: null,
+            openTabs: [],
             pendingDeletes: { collections: [], requests: [], environments: [] },
           }
         }),
@@ -458,6 +535,7 @@ export const useStore = create<AppState>()(
             selectedRequestId: requests.some((r) => r.id === s.selectedRequestId)
               ? s.selectedRequestId
               : null,
+            openTabs: s.openTabs.filter((id) => requests.some((r) => r.id === id)),
             // env que sumiu no remoto não pode ficar ativo em collection nenhuma
             activeEnvByCollection: Object.fromEntries(
               Object.entries(s.activeEnvByCollection).map(([colId, envId]) => [
@@ -519,6 +597,7 @@ export const useStore = create<AppState>()(
             selectedRequestId: reqIds.includes(s.selectedRequestId ?? '')
               ? null
               : s.selectedRequestId,
+            openTabs: s.openTabs.filter((id) => !reqIds.includes(id)),
             pendingDeletes: {
               collections: [...s.pendingDeletes.collections, ...colIds],
               requests: [...s.pendingDeletes.requests, ...reqIds],
@@ -629,6 +708,7 @@ export const useStore = create<AppState>()(
             selectedRequestId: doomed.includes(s.selectedRequestId ?? '')
               ? null
               : s.selectedRequestId,
+            openTabs: s.openTabs.filter((id) => !doomed.includes(id)),
             // apagou a collection aberta (ou uma ancestral dela)? volta pra lista
             openCollectionId: allColIds.has(s.openCollectionId ?? '')
               ? null
@@ -645,8 +725,8 @@ export const useStore = create<AppState>()(
 
       addRequest: (collectionId) => {
         const id = uid()
-        set((s) => ({
-          requests: [
+        set((s) => {
+          const requests: ApiRequest[] = [
             ...s.requests,
             {
               id,
@@ -668,9 +748,13 @@ export const useStore = create<AppState>()(
               version: 1,
               updatedAt: now(),
             },
-          ],
-          selectedRequestId: id,
-        }))
+          ]
+          return {
+            requests,
+            selectedRequestId: id,
+            openTabs: withTab(s.openTabs, s.collections, requests, id),
+          }
+        })
         return id
       },
 
@@ -685,13 +769,71 @@ export const useStore = create<AppState>()(
         set((s) => ({
           requests: s.requests.filter((r) => r.id !== id),
           selectedRequestId: s.selectedRequestId === id ? null : s.selectedRequestId,
+          openTabs: s.openTabs.filter((t) => t !== id),
           pendingDeletes: {
             ...s.pendingDeletes,
             requests: [...s.pendingDeletes.requests, id],
           },
         })),
 
-      selectRequest: (id) => set({ selectedRequestId: id }),
+      // Selecionar é o que povoa a barra: veio da sidebar, do Ctrl+K ou de uma
+      // aba, a request passa a ter aba. `null` é o "voltar pro início" e não
+      // abre nada.
+      selectRequest: (id) =>
+        set((s) =>
+          id === null
+            ? { selectedRequestId: null }
+            : {
+                selectedRequestId: id,
+                openTabs: withTab(s.openTabs, s.collections, s.requests, id),
+              },
+        ),
+
+      openTab: (id) =>
+        set((s) => ({
+          selectedRequestId: id,
+          openTabs: withTab(s.openTabs, s.collections, s.requests, id),
+        })),
+
+      closeTab: (id) =>
+        set((s) => {
+          if (!s.openTabs.includes(id)) return s
+          const openTabs = s.openTabs.filter((t) => t !== id)
+          if (s.selectedRequestId !== id) return { openTabs }
+          // Fechou a aba ativa: cai na vizinha da direita e, na última, na da
+          // esquerda. Só entre abas da mesma collection — pular pra outra
+          // trocaria o environment por baixo de quem só fechou uma aba.
+          const scope = tabScope(s.collections, s.requests, id)
+          const siblings = s.openTabs.filter(
+            (t) => tabScope(s.collections, s.requests, t) === scope,
+          )
+          const at = siblings.indexOf(id)
+          return { openTabs, selectedRequestId: siblings[at + 1] ?? siblings[at - 1] ?? null }
+        }),
+
+      closeOtherTabs: (id) =>
+        set((s) => {
+          const scope = tabScope(s.collections, s.requests, id)
+          return {
+            openTabs: s.openTabs.filter(
+              (t) => t === id || tabScope(s.collections, s.requests, t) !== scope,
+            ),
+            // A aba que sobrou é a ativa: se a anterior era outra, ela acabou
+            // de fechar e deixar a seleção apontando pro nada.
+            selectedRequestId: id,
+          }
+        }),
+
+      closeAllTabs: () =>
+        set((s) => {
+          const scope = openScope(s)
+          const stays = (t: string) => tabScope(s.collections, s.requests, t) !== scope
+          return {
+            openTabs: s.openTabs.filter(stays),
+            selectedRequestId:
+              s.selectedRequestId && stays(s.selectedRequestId) ? s.selectedRequestId : null,
+          }
+        }),
 
       duplicateRequest: (id) =>
         set((s) => {
@@ -706,7 +848,12 @@ export const useStore = create<AppState>()(
             version: 1,
             updatedAt: now(),
           }
-          return { requests: [...s.requests, copy], selectedRequestId: copy.id }
+          const requests = [...s.requests, copy]
+          return {
+            requests,
+            selectedRequestId: copy.id,
+            openTabs: withTab(s.openTabs, s.collections, requests, copy.id),
+          }
         }),
 
       moveRequest: (id, collectionId, index) =>
@@ -775,27 +922,32 @@ export const useStore = create<AppState>()(
           const colOffset = nextSort(s.collections.filter((c) => c.parentId === null))
           const reqOffset = nextSort(s.requests)
 
+          const collections = [
+            ...s.collections,
+            ...(data.collections ?? []).map((c) => ({
+              ...c,
+              sortOrder: c.parentId === null ? c.sortOrder + colOffset : c.sortOrder,
+            })),
+          ]
+          const requests = [
+            ...s.requests,
+            ...(data.requests ?? []).map((r) => ({
+              ...r,
+              sortOrder: r.sortOrder + reqOffset,
+            })),
+          ]
+          const first = data.requests?.[0]?.id ?? null
+
           return {
-            collections: [
-              ...s.collections,
-              ...(data.collections ?? []).map((c) => ({
-                ...c,
-                sortOrder: c.parentId === null ? c.sortOrder + colOffset : c.sortOrder,
-              })),
-            ],
-            requests: [
-              ...s.requests,
-              ...(data.requests ?? []).map((r) => ({
-                ...r,
-                sortOrder: r.sortOrder + reqOffset,
-              })),
-            ],
+            collections,
+            requests,
             // Environments chegam do importer já pendurados na collection nova,
             // com nomes únicos dentro dela. Mesclar no base local ou renomear
             // contra os envs das OUTRAS collections era coisa do modelo antigo
             // (env por workspace) — hoje só corromperia o import.
             environments: [...s.environments, ...(data.environments ?? [])],
-            selectedRequestId: data.requests?.[0]?.id ?? s.selectedRequestId,
+            selectedRequestId: first ?? s.selectedRequestId,
+            openTabs: first ? withTab(s.openTabs, collections, requests, first) : s.openTabs,
           }
         }),
 
@@ -962,4 +1114,36 @@ export function useCollectionEnvs(collectionId: string | null): Environment[] {
 
 export function useSelectedRequest() {
   return useStore((s) => s.requests.find((r) => r.id === s.selectedRequestId) ?? null)
+}
+
+/**
+ * Abas visíveis: as da collection em contexto, na ordem em que entraram.
+ *
+ * O recorte mora aqui, e não dentro do `openTabs`, porque são duas perguntas
+ * diferentes: o estado guarda tudo que a pessoa abriu, e a barra mostra só o
+ * pedaço da collection de agora. Trocar de collection não fecha nada — as
+ * abas da outra voltam quando você volta. E id de request que sumiu (apagada
+ * no colega, project trocado) nunca chega a virar aba na tela, mesmo se algum
+ * caminho de poda deixar passar.
+ *
+ * O filtro fica num `useMemo` pelo mesmo motivo do `useCollectionEnvs`:
+ * seletor que devolve array novo a cada chamada faz o zustand achar que o
+ * estado mudou e o React entra em loop.
+ */
+export function useVisibleTabs(): ApiRequest[] {
+  const openTabs = useStore((s) => s.openTabs)
+  const requests = useStore((s) => s.requests)
+  const collections = useStore((s) => s.collections)
+  const selectedRequestId = useStore((s) => s.selectedRequestId)
+  const openCollectionId = useStore((s) => s.openCollectionId)
+  return useMemo(() => {
+    const scope = openScope({ collections, requests, selectedRequestId, openCollectionId })
+    const byId = new Map(requests.map((r) => [r.id, r]))
+    return openTabs.flatMap((id) => {
+      const request = byId.get(id)
+      if (!request) return []
+      const root = rootCollectionOf(collections, request.collectionId)?.id ?? null
+      return root === scope ? [request] : []
+    })
+  }, [openTabs, requests, collections, selectedRequestId, openCollectionId])
 }
