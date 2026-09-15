@@ -140,7 +140,10 @@ function App() {
             gridTemplateColumns: `${sidebarWidth}px ${HANDLE}px minmax(0,1fr)`,
           }}
         >
-          <div style={{ gridRow: '1 / span 2' }} className="grid min-h-0 overflow-hidden">
+          <div
+            style={{ gridRow: '1 / span 2', gridTemplateRows: 'minmax(0,1fr)' }}
+            className="grid min-h-0 overflow-hidden"
+          >
             <Sidebar />
           </div>
           <ResizeHandle
@@ -159,11 +162,12 @@ function App() {
           <div
             className="grid min-h-0"
             style={{
-              // Linha e coluna explícitas: a barra de abas não renderiza quando
-              // não há aba, e no auto-placement os painéis subiriam pra linha 1
-              // — que é `auto` e os deixaria com a altura do conteúdo.
+              // Linha e coluna explícitas: sem barra de abas o auto-placement
+              // subiria os painéis pra linha 1. E linha implícita é `auto` — o
+              // painel cresceria com a response e mataria o scroll interno.
               gridColumn: 3,
               gridRow: 2,
+              gridTemplateRows: 'minmax(0,1fr)',
               gridTemplateColumns: request
                 ? `minmax(0,${requestSplit}fr) ${HANDLE}px minmax(0,${1 - requestSplit}fr)`
                 : 'minmax(0,1fr)',
