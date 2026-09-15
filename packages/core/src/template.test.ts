@@ -4,6 +4,7 @@ import {
   applyPathParams,
   completeToken,
   extractPathParams,
+  splitQueryParams,
   extractVariables,
   findOpenToken,
   rankVariables,
@@ -364,5 +365,70 @@ describe("path params (:id)", () => {
       updatedAt: "2026-09-01T00:00:00.000Z",
     };
     expect(resolveRequest(request, null, env).url).toBe("https://api.com/advbox/lawyers");
+  });
+});
+
+describe("query string e path params não se misturam", () => {
+  const prod =
+    "https://captura-djen.munin.ia.br/api/v1/communications?:status=all&tracker_id=16853&published_at=2026-09-14&per_page=100";
+
+  it("`:` dentro da query não é path param", () => {
+    expect(extractPathParams(prod)).toEqual([]);
+  });
+
+  it("path param no caminho continua valendo mesmo com query na URL", () => {
+    expect(extractPathParams("/api/trackers/:id/pushes?status=all")).toEqual(["id"]);
+  });
+
+  it("preencher um path param não mexe no que está depois do `?`", () => {
+    const out = applyPathParams("/api/trackers/:id?:status=all", { id: "16853" });
+    expect(out.output).toBe("/api/trackers/16853?:status=all");
+    expect(out.missing).toEqual([]);
+  });
+
+  it("separa a query da URL de prod em pares", () => {
+    const out = splitQueryParams(prod);
+    expect(out.url).toBe("https://captura-djen.munin.ia.br/api/v1/communications");
+    expect(out.params).toEqual([
+      { key: ":status", value: "all" },
+      { key: "tracker_id", value: "16853" },
+      { key: "published_at", value: "2026-09-14" },
+      { key: "per_page", value: "100" },
+    ]);
+  });
+
+  it("URL sem query fica como está", () => {
+    expect(splitQueryParams("https://api.com/v1/coisas")).toEqual({
+      url: "https://api.com/v1/coisas",
+      params: [],
+    });
+  });
+
+  it("valor sai decodificado pra não encodar de novo no envio", () => {
+    expect(splitQueryParams("https://api.com/x?q=a%20b&s=1%2B2").params).toEqual([
+      { key: "q", value: "a b" },
+      { key: "s", value: "1+2" },
+    ]);
+  });
+
+  it("par sem valor vira valor vazio, não some", () => {
+    expect(splitQueryParams("https://api.com/x?debug&page=2").params).toEqual([
+      { key: "debug", value: "" },
+      { key: "page", value: "2" },
+    ]);
+  });
+
+  it("chave repetida mantém as duas linhas, na ordem", () => {
+    expect(splitQueryParams("https://api.com/x?tag=a&tag=b").params).toEqual([
+      { key: "tag", value: "a" },
+      { key: "tag", value: "b" },
+    ]);
+  });
+
+  it("`?` sozinho não engole a URL", () => {
+    expect(splitQueryParams("https://api.com/x?")).toEqual({
+      url: "https://api.com/x?",
+      params: [],
+    });
   });
 });
