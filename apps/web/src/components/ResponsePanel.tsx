@@ -1,9 +1,13 @@
-import { useState } from 'react'
-import { Check, Copy, X } from 'lucide-react'
-import CodeMirror from '@uiw/react-codemirror'
+import { useMemo, useRef, useState } from 'react'
+import { Check, ChevronsDownUp, ChevronsUpDown, Copy, X } from 'lucide-react'
+import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
+import { foldAll, unfoldAll } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
 import { codeTheme } from '../lib/codeTheme'
+import { applyJsonPath } from '../lib/jsonPath'
+import { jsonFold } from '../lib/jsonFold'
+import { JsonPathBar } from './JsonPathBar'
 import { copyText } from '../lib/clipboard'
 import { useStore, type HistoryEntry } from '../store'
 import { useSession } from '../sessionStore'
@@ -30,11 +34,13 @@ function statusText(status: number) {
   return 'text-bad'
 }
 
-function prettyBody(body: string): { text: string; isJson: boolean } {
+/** `data` viaja junto pro filtro não refazer o parse a cada tecla. */
+function prettyBody(body: string): { text: string; isJson: boolean; data: unknown } {
   try {
-    return { text: JSON.stringify(JSON.parse(body), null, 2), isJson: true }
+    const data: unknown = JSON.parse(body)
+    return { text: JSON.stringify(data, null, 2), isJson: true, data }
   } catch {
-    return { text: body, isJson: false }
+    return { text: body, isJson: false, data: null }
   }
 }
 
@@ -56,20 +62,41 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
   const [tab, setTab] = useState<Tab>('body')
   const [viewingId, setViewingId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  // O painel remonta por request (`key` em quem usa), então o filtro já
+  // começa vazio ao trocar de aba.
+  const [filter, setFilter] = useState('')
+  const editor = useRef<ReactCodeMirrorRef>(null)
 
   const viewingEntry: HistoryEntry | null =
     viewingId !== null ? (history.find((h) => h.id === viewingId) ?? null) : null
 
   const view: View | null = viewingEntry ? viewingEntry : response?.ok ? response : null
 
-  // Formatado uma vez: é o mesmo texto que o editor mostra e que o botão copia.
-  const pretty = view ? prettyBody(view.body) : null
+  // O memo é o que dá ao `data` identidade estável — sem ela o memo do filtro
+  // abaixo nunca acertaria. `view` vem de store, então só muda de verdade.
+  const pretty = useMemo(() => (view ? prettyBody(view.body) : null), [view])
+
+  const filtered = useMemo(
+    () =>
+      pretty?.isJson
+        ? applyJsonPath(pretty.data, pretty.text, filter)
+        : { text: pretty?.text ?? '', matches: null, error: null },
+    [pretty, filter],
+  )
 
   const copy = async () => {
     if (!pretty) return
-    await copyText(pretty.text)
+    // Com filtro na barra, o recorte é o que interessa.
+    await copyText(filtered.text)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }
+
+  // Dobrar item a item não serve numa lista de mil: o botão age no documento
+  // inteiro, e a seta de cada linha continua lá pra abrir o que interessa.
+  const fold = (all: boolean) => {
+    const view = editor.current?.view
+    if (view) (all ? foldAll : unfoldAll)(view)
   }
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
@@ -146,11 +173,34 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
               </button>
             ))}
 
-            {pretty && pretty.text.length > 0 && (
+            {pretty?.isJson && tab === 'body' && (
+              <div className="my-1 ml-auto flex shrink-0 items-center self-center">
+                <button
+                  onClick={() => fold(true)}
+                  className="flex items-center rounded p-1 text-ink-faint transition hover:bg-raised hover:text-ink"
+                  title="Colapsar tudo"
+                  aria-label="Colapsar tudo"
+                >
+                  <ChevronsDownUp aria-hidden className="size-3.5" />
+                </button>
+                <button
+                  onClick={() => fold(false)}
+                  className="flex items-center rounded p-1 text-ink-faint transition hover:bg-raised hover:text-ink"
+                  title="Expandir tudo"
+                  aria-label="Expandir tudo"
+                >
+                  <ChevronsUpDown aria-hidden className="size-3.5" />
+                </button>
+              </div>
+            )}
+
+            {pretty && filtered.text.length > 0 && (
               <button
                 onClick={copy}
-                className="my-1 ml-auto flex shrink-0 items-center gap-1 self-center rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink"
-                title="Copiar o body da response"
+                className={`my-1 flex shrink-0 items-center gap-1 self-center rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink ${
+                  pretty.isJson && tab === 'body' ? '' : 'ml-auto'
+                }`}
+                title="Copiar o que está na tela"
               >
                 {copied ? (
                   <>
@@ -169,19 +219,32 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
 
           {tab === 'body' &&
             (pretty ? (
-              // overflow-hidden, e não auto: quem rola é o .cm-scroller do
-              // CodeMirror. Dois containers de scroll aninhados se anulam.
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <CodeMirror
-                  value={pretty.text}
-                  readOnly
-                  // Quebra a linha em vez de abrir scroll lateral: resposta
-                  // com uma linha gigante é a regra, não a exceção.
-                  extensions={pretty.isJson ? [json(), WRAP, codeTheme] : [WRAP, codeTheme]}
-                  theme="none"
-                  height="100%"
-                  style={{ height: '100%' }}
-                />
+              <div className="flex min-h-0 flex-1 flex-col">
+                {/* overflow-hidden, e não auto: quem rola é o .cm-scroller do
+                    CodeMirror. Dois containers de scroll aninhados se anulam. */}
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <CodeMirror
+                    value={filtered.text}
+                    readOnly
+                    // Quebra a linha em vez de abrir scroll lateral: resposta
+                    // com uma linha gigante é a regra, não a exceção.
+                    extensions={
+                      pretty.isJson ? [json(), jsonFold, WRAP, codeTheme] : [WRAP, codeTheme]
+                    }
+                    ref={editor}
+                    theme="none"
+                    height="100%"
+                    style={{ height: '100%' }}
+                  />
+                </div>
+                {pretty.isJson && (
+                  <JsonPathBar
+                    value={filter}
+                    onChange={setFilter}
+                    matches={filtered.matches}
+                    error={filtered.error}
+                  />
+                )}
               </div>
             ) : (
               <p className="p-4 text-sm text-ink-faint">
