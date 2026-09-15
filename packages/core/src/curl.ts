@@ -1,9 +1,12 @@
 import type { HttpMethod, KeyValue } from "./types.js";
+import { splitQueryParams } from "./template.js";
 import type { ResolvedRequest } from "./template.js";
 
 export interface ParsedCurl {
   method: HttpMethod;
+  /** Sem a query string — ela vem separada em `queryParams`. */
   url: string;
+  queryParams: { key: string; value: string }[];
   headers: { key: string; value: string }[];
   body: string | null;
   bodyType: "none" | "json" | "text";
@@ -48,7 +51,8 @@ function tokenize(command: string): string[] {
   return tokens;
 }
 
-/** Importa um comando `curl ...` pra uma request. Suporta -X, -H, -d/--data*, -u, --url. */
+/** Importa um comando `curl ...` pra uma request. Suporta -X, -H, -d/--data*, -u, --url.
+ *  A query string da URL vira linhas de query param — é lá que dá pra editar. */
 export function parseCurl(command: string): ParsedCurl {
   const tokens = tokenize(command.trim());
   if (tokens[0] !== "curl") throw new Error("O comando precisa começar com 'curl'.");
@@ -131,9 +135,12 @@ export function parseCurl(command: string): ParsedCurl {
   const looksJson =
     contentType.includes("json") || (body !== null && /^\s*[[{]/.test(body));
 
+  const split = splitQueryParams(url);
+
   return {
     method: (METHODS.has(finalMethod) ? finalMethod : "GET") as HttpMethod,
-    url,
+    url: split.url,
+    queryParams: split.params,
     headers,
     body,
     bodyType: body === null ? "none" : looksJson ? "json" : "text",
@@ -162,4 +169,17 @@ export function curlHeadersToKeyValues(
   makeId: () => string,
 ): KeyValue[] {
   return parsed.headers.map((h) => ({ id: makeId(), key: h.key, value: h.value, enabled: true }));
+}
+
+/** Idem pros query params que vieram da URL. */
+export function curlQueryToKeyValues(
+  parsed: ParsedCurl,
+  makeId: () => string,
+): KeyValue[] {
+  return parsed.queryParams.map((p) => ({
+    id: makeId(),
+    key: p.key,
+    value: p.value,
+    enabled: true,
+  }));
 }

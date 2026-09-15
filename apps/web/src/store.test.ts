@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useStore } from './store'
+import { MAX_TABS_PER_COLLECTION, useStore } from './store'
 import { withScope } from './lib/sync'
 import type { ApiRequest, Collection, Environment } from '@somnolent/core'
 
@@ -266,5 +266,233 @@ describe('keyring: a máquina lembra a chave de cada project', () => {
     expect(depois.keyring[b]).toBeUndefined()
     expect(depois.openProjectId).toBe(a)
     expect(depois.connection.key).toBeNull()
+  })
+})
+
+describe('abas das requests abertas', () => {
+  /** Dois projects não entram aqui: a barra recorta por collection. */
+  const setup = () => {
+    const projectId = useStore.getState().openProjectId!
+    useStore.setState({
+      collections: [col('A', projectId, null), col('sub', projectId, 'A'), col('B', projectId, null)],
+      requests: [],
+      openCollectionId: 'A',
+      selectedRequestId: null,
+      openTabs: [],
+    })
+    return projectId
+  }
+
+  /** Cria n requests numa collection e devolve os ids, sem abrir aba. */
+  const seedRequests = (projectId: string, collectionId: string, ids: string[]) => {
+    useStore.setState((s) => ({
+      requests: [...s.requests, ...ids.map((id) => req(id, projectId, collectionId))],
+    }))
+    return ids
+  }
+
+  it('selecionar uma request abre a aba dela, à direita', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['r1', 'r2'])
+
+    useStore.getState().selectRequest('r1')
+    useStore.getState().selectRequest('r2')
+
+    expect(useStore.getState().openTabs).toEqual(['r1', 'r2'])
+  })
+
+  it('reabrir uma aba já aberta não a move de posição', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['r1', 'r2', 'r3'])
+    ;['r1', 'r2', 'r3'].forEach((id) => useStore.getState().selectRequest(id))
+
+    useStore.getState().openTab('r1')
+
+    expect(useStore.getState().openTabs).toEqual(['r1', 'r2', 'r3'])
+    expect(useStore.getState().selectedRequestId).toBe('r1')
+  })
+
+  it('voltar pro início não abre aba nenhuma', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['r1'])
+    useStore.getState().selectRequest('r1')
+
+    useStore.getState().selectRequest(null)
+
+    expect(useStore.getState().openTabs).toEqual(['r1'])
+    expect(useStore.getState().selectedRequestId).toBeNull()
+  })
+
+  it('na 11ª aba a mais antiga sai e as 10 últimas ficam', () => {
+    const projectId = setup()
+    const ids = Array.from({ length: 11 }, (_, i) => `r${i}`)
+    seedRequests(projectId, 'A', ids)
+
+    ids.forEach((id) => useStore.getState().selectRequest(id))
+
+    expect(useStore.getState().openTabs).toEqual(ids.slice(1))
+    expect(useStore.getState().openTabs).toHaveLength(MAX_TABS_PER_COLLECTION)
+  })
+
+  it('o teto é por collection: encher A não fecha aba de B', () => {
+    const projectId = setup()
+    const inA = Array.from({ length: MAX_TABS_PER_COLLECTION }, (_, i) => `a${i}`)
+    seedRequests(projectId, 'A', inA)
+    seedRequests(projectId, 'B', ['b1'])
+
+    useStore.getState().selectRequest('b1')
+    inA.forEach((id) => useStore.getState().selectRequest(id))
+
+    expect(useStore.getState().openTabs).toEqual(['b1', ...inA])
+  })
+
+  it('request em subpasta conta no teto da collection raiz', () => {
+    const projectId = setup()
+    const raiz = Array.from({ length: MAX_TABS_PER_COLLECTION }, (_, i) => `a${i}`)
+    seedRequests(projectId, 'A', raiz)
+    seedRequests(projectId, 'sub', ['dentro'])
+
+    raiz.forEach((id) => useStore.getState().selectRequest(id))
+    useStore.getState().selectRequest('dentro')
+
+    // 'sub' pende de 'A', então a 11ª derruba a mais antiga de 'A'
+    expect(useStore.getState().openTabs).toEqual([...raiz.slice(1), 'dentro'])
+  })
+
+  it('fechar a aba ativa cai na vizinha da direita', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['r1', 'r2', 'r3'])
+    ;['r1', 'r2', 'r3'].forEach((id) => useStore.getState().selectRequest(id))
+    useStore.getState().openTab('r2')
+
+    useStore.getState().closeTab('r2')
+
+    expect(useStore.getState().openTabs).toEqual(['r1', 'r3'])
+    expect(useStore.getState().selectedRequestId).toBe('r3')
+  })
+
+  it('fechar a última aba ativa cai na da esquerda', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['r1', 'r2'])
+    ;['r1', 'r2'].forEach((id) => useStore.getState().selectRequest(id))
+
+    useStore.getState().closeTab('r2')
+
+    expect(useStore.getState().selectedRequestId).toBe('r1')
+  })
+
+  it('fechar aba que não é a ativa não mexe na seleção', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['r1', 'r2'])
+    ;['r1', 'r2'].forEach((id) => useStore.getState().selectRequest(id))
+
+    useStore.getState().closeTab('r1')
+
+    expect(useStore.getState().selectedRequestId).toBe('r2')
+  })
+
+  it('a vizinha nunca é de outra collection', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['a1'])
+    seedRequests(projectId, 'B', ['b1'])
+    useStore.getState().selectRequest('b1')
+    useStore.getState().selectRequest('a1')
+
+    useStore.getState().closeTab('a1')
+
+    // sem vizinha em A, a seleção esvazia — não pula pra B e troca o environment
+    expect(useStore.getState().selectedRequestId).toBeNull()
+    expect(useStore.getState().openTabs).toEqual(['b1'])
+  })
+
+  it('fechar as outras deixa só a clicada, e ativa', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['r1', 'r2', 'r3'])
+    ;['r1', 'r2', 'r3'].forEach((id) => useStore.getState().selectRequest(id))
+
+    useStore.getState().closeOtherTabs('r1')
+
+    expect(useStore.getState().openTabs).toEqual(['r1'])
+    expect(useStore.getState().selectedRequestId).toBe('r1')
+  })
+
+  it('fechar as outras poupa as abas das outras collections', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['a1', 'a2'])
+    seedRequests(projectId, 'B', ['b1'])
+    ;['b1', 'a1', 'a2'].forEach((id) => useStore.getState().selectRequest(id))
+
+    useStore.getState().closeOtherTabs('a1')
+
+    expect(useStore.getState().openTabs).toEqual(['b1', 'a1'])
+  })
+
+  it('fechar todas limpa a collection em contexto e a seleção', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['a1', 'a2'])
+    seedRequests(projectId, 'B', ['b1'])
+    ;['b1', 'a1', 'a2'].forEach((id) => useStore.getState().selectRequest(id))
+
+    useStore.getState().closeAllTabs()
+
+    expect(useStore.getState().openTabs).toEqual(['b1'])
+    expect(useStore.getState().selectedRequestId).toBeNull()
+  })
+
+  it('apagar a request fecha a aba dela', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['r1', 'r2'])
+    ;['r1', 'r2'].forEach((id) => useStore.getState().selectRequest(id))
+
+    useStore.getState().deleteRequest('r1')
+
+    expect(useStore.getState().openTabs).toEqual(['r2'])
+  })
+
+  it('apagar a collection fecha as abas das requests dela', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['a1'])
+    seedRequests(projectId, 'sub', ['dentro'])
+    seedRequests(projectId, 'B', ['b1'])
+    ;['a1', 'dentro', 'b1'].forEach((id) => useStore.getState().selectRequest(id))
+
+    useStore.getState().deleteCollection('A')
+
+    // 'sub' pende de 'A' e cai junto
+    expect(useStore.getState().openTabs).toEqual(['b1'])
+  })
+
+  it('request apagada no remoto não sobra como aba', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['r1', 'r2'])
+    ;['r1', 'r2'].forEach((id) => useStore.getState().selectRequest(id))
+
+    useStore.getState().applyRemote(
+      { collections: [], requests: [], environments: [] },
+      { requests: ['r1'] },
+    )
+
+    expect(useStore.getState().openTabs).toEqual(['r2'])
+  })
+
+  it('request nova nasce com aba', () => {
+    setup()
+    const id = useStore.getState().addRequest('A')
+
+    expect(useStore.getState().openTabs).toEqual([id])
+    expect(useStore.getState().selectedRequestId).toBe(id)
+  })
+
+  it('duplicar abre a aba da cópia sem fechar a do original', () => {
+    const projectId = setup()
+    seedRequests(projectId, 'A', ['r1'])
+    useStore.getState().selectRequest('r1')
+
+    useStore.getState().duplicateRequest('r1')
+
+    const depois = useStore.getState()
+    expect(depois.openTabs).toHaveLength(2)
+    expect(depois.openTabs[0]).toBe('r1')
+    expect(depois.selectedRequestId).toBe(depois.openTabs[1])
   })
 })

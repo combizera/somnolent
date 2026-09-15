@@ -67,14 +67,39 @@ export function extractVariables(template: string): string[] {
  */
 const PATH_PARAM = /:([A-Za-z_][\w-]*)/g;
 
+/** Parte antes do `?` e a query. Depois do `?`, `:` é caractere comum — quem
+ *  escreve `?:status=all` quer um query param, não um path param. */
+function splitAtQuery(url: string): [string, string] {
+  const at = url.indexOf("?");
+  return at === -1 ? [url, ""] : [url.slice(0, at), url.slice(at)];
+}
+
 /** Nomes dos path params citados na URL, na ordem, sem repetir. */
 export function extractPathParams(url: string): string[] {
   const names: string[] = [];
-  for (const match of url.matchAll(PATH_PARAM)) {
+  for (const match of splitAtQuery(url)[0].matchAll(PATH_PARAM)) {
     const name = match[1];
     if (name !== undefined && !names.includes(name)) names.push(name);
   }
   return names;
+}
+
+/** Separa a query string da URL em pares editáveis.
+ *
+ *  Os valores saem decodificados porque é assim que voltam pra URL no envio —
+ *  guardar `a%20b` cru viraria `a%2520b` na segunda passada. */
+export function splitQueryParams(url: string): {
+  url: string;
+  params: { key: string; value: string }[];
+} {
+  const [base, query] = splitAtQuery(url);
+  if (!query) return { url, params: [] };
+  const params: { key: string; value: string }[] = [];
+  for (const [key, value] of new URLSearchParams(query.slice(1))) {
+    params.push({ key, value });
+  }
+  // Sem par nenhum (`?` sozinho, ou `?#frag`), a query não some da URL.
+  return params.length > 0 ? { url: base, params } : { url, params: [] };
 }
 
 /**
@@ -86,7 +111,8 @@ export function applyPathParams(
   values: Record<string, string>,
 ): ResolveResult {
   const missing: string[] = [];
-  const output = url.replace(PATH_PARAM, (match, name: string) => {
+  const [base, query] = splitAtQuery(url);
+  const output = base.replace(PATH_PARAM, (match, name: string) => {
     const value = values[name];
     if (value === undefined || value === "") {
       if (!missing.includes(`:${name}`)) missing.push(`:${name}`);
@@ -94,7 +120,7 @@ export function applyPathParams(
     }
     return encodeURIComponent(value);
   });
-  return { output, missing };
+  return { output: output + query, missing };
 }
 
 export interface ResolvedRequest {

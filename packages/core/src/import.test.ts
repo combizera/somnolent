@@ -231,6 +231,22 @@ describe("toCurl + auth helper", () => {
     expect(cmd).toContain(`-d '{"a":1}'`);
   });
 
+  it("a query da URL vira linhas de param, e a URL fica limpa", () => {
+    const parsed = parseCurl(
+      "curl 'https://captura-djen.munin.ia.br/api/v1/communications?:status=all&tracker_id=16853&per_page=100'",
+    );
+    expect(parsed.url).toBe("https://captura-djen.munin.ia.br/api/v1/communications");
+    expect(parsed.queryParams).toEqual([
+      { key: ":status", value: "all" },
+      { key: "tracker_id", value: "16853" },
+      { key: "per_page", value: "100" },
+    ]);
+  });
+
+  it("curl sem query não ganha param nenhum", () => {
+    expect(parseCurl("curl https://a.com/x").queryParams).toEqual([]);
+  });
+
   it("curl → parse → curl é estável", () => {
     const resolved = resolveRequest(request, null, env);
     const reparsed = parseCurl(toCurl(resolved));
