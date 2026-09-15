@@ -101,6 +101,30 @@ body {
   color: var(--color-ink-faint) !important;
 }
 
+/* As setas de fold vêm como glifo minúsculo na cor do gutter — dá pra clicar,
+   mas ninguém acha. Área maior e contraste no hover. */
+.cm-foldGutter .cm-gutterElement {
+  padding: 0 3px;
+  cursor: pointer;
+  color: var(--color-ink-dim);
+  transition: color 0.1s;
+}
+
+.cm-foldGutter .cm-gutterElement:hover {
+  color: var(--color-brand-hi);
+}
+
+/* O marcador do trecho dobrado é um `…` sem contorno; dar corpo a ele é o que
+   mostra que há conteúdo escondido ali. */
+.cm-foldPlaceholder {
+  background: var(--color-raised) !important;
+  border: 1px solid var(--color-line) !important;
+  border-radius: 4px;
+  color: var(--color-ink-dim) !important;
+  padding: 0 6px;
+  margin: 0 2px;
+}
+
 .cm-activeLine,
 .cm-activeLineGutter {
   background: rgba(124, 92, 255, 0.06) !important;
