@@ -1,5 +1,10 @@
 import { useState } from 'react'
-import { curlHeadersToKeyValues, importInsomniaExport, parseCurl } from '@somnolent/core'
+import {
+  curlHeadersToKeyValues,
+  curlQueryToKeyValues,
+  importInsomniaExport,
+  parseCurl,
+} from '@somnolent/core'
 import { useStore } from '../store'
 
 interface Summary {
@@ -37,6 +42,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
       method: parsed.method,
       url: parsed.url,
       headers: curlHeadersToKeyValues(parsed, () => crypto.randomUUID()),
+      queryParams: curlQueryToKeyValues(parsed, () => crypto.randomUUID()),
       body: parsed.body,
       bodyType: parsed.bodyType,
     })
