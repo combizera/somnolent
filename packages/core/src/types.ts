@@ -8,8 +8,8 @@ export type HttpMethod =
   | "OPTIONS";
 
 /**
- * Project: o nível de topo e a unidade que se compartilha inteira. Guarda
- * collections; o antigo `Workspace` era isto, só que implícito no cliente.
+ * Project: the top level and the unit shared as a whole. Holds collections;
+ * the old `Workspace` was this, only implicit in the client.
  */
 export interface Project {
   id: string;
@@ -38,9 +38,9 @@ export interface KeyValue {
 
 export interface RequestAuth {
   type: "none" | "bearer" | "basic";
-  /** Bearer — aceita {{vars}}. */
+  /** Bearer — accepts {{vars}}. */
   token?: string;
-  /** Basic — aceitam {{vars}}. */
+  /** Basic — accept {{vars}}. */
   username?: string;
   password?: string;
 }
@@ -50,21 +50,23 @@ export interface ApiRequest {
   projectId: string;
   collectionId: string | null;
   name: string;
-  /** Anotação livre — vem do campo `description` do Insomnia. */
+  /** Free-form note — comes from Insomnia's `description` field. */
   description?: string;
   method: HttpMethod;
-  /** Template — pode conter {{vars}}, ex.: "{{ base_url }}/v1/clients" */
+  /** Template — may contain {{vars}}, e.g. "{{ base_url }}/v1/clients" */
   url: string;
   headers: KeyValue[];
   queryParams: KeyValue[];
   /**
-   * Valores dos `:params` que aparecem na URL. A lista de nomes vem da própria
-   * URL — isto aqui só guarda o que a pessoa preencheu.
+   * Values for the `:params` in the URL. The list of names comes from the URL
+   * itself — this only holds what the person filled in.
    */
   pathParams?: KeyValue[];
   body: string | null;
-  bodyType: "none" | "json" | "text";
-  /** Auth helper — gera o header Authorization no send (header manual tem precedência). */
+  bodyType: "none" | "json" | "text" | "form";
+  /** `form-urlencoded` rows. Kept apart from `body` so Form ↔ JSON loses nothing. */
+  formBody?: KeyValue[];
+  /** Auth helper — builds the Authorization header on send (a manual header wins). */
   auth?: RequestAuth;
   sortOrder: number;
   version: number;
@@ -73,7 +75,7 @@ export interface ApiRequest {
 
 export interface EnvironmentVariable {
   key: string;
-  /** Valor de variáveis secretas fica só na máquina local (não sincroniza). */
+  /** Secret variable values stay on the local machine only (never synced). */
   value: string;
   secret: boolean;
   enabled: boolean;
@@ -82,17 +84,17 @@ export interface EnvironmentVariable {
 export interface Environment {
   id: string;
   /**
-   * Collection dona — sempre uma raiz (`parentId: null`), nunca uma pasta.
-   * É o que faz uma collection compartilhada chegar resolvendo as variáveis.
+   * Owning collection — always a root (`parentId: null`), never a folder.
+   * It is what makes a shared collection arrive resolving its variables.
    */
   collectionId: string;
   name: string;
-  /** O base environment é aplicado antes do ambiente ativo. */
+  /** The base environment is applied before the active one. */
   isBase: boolean;
-  /** Cor de destaque da UI quando este ambiente está ativo (hex). */
+  /** UI accent color while this environment is active (hex). */
   color?: string;
   variables: EnvironmentVariable[];
-  /** Ordem escolhida pela pessoa no gerenciador (o base também entra na ordem). */
+  /** Order chosen by the person in the manager (the base is in it too). */
   sortOrder: number;
   version: number;
   updatedAt: string;
