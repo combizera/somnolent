@@ -6,7 +6,7 @@ import {
 } from "./insomniaCommon.js";
 import type { ApiRequest, Collection, Environment, KeyValue } from "./types.js";
 
-/** Formato dos nós do export v5 (YAML) que a gente consome. */
+/** Shape of the v5 export (YAML) nodes we consume. */
 interface V5Meta {
   id?: string;
   sortKey?: number;
@@ -22,12 +22,12 @@ interface V5Pair {
 interface V5Node {
   name?: string;
   meta?: V5Meta;
-  /** Presente só em pastas. */
+  /** Folders only. */
   children?: V5Node[];
-  /** Presentes só em requests. */
+  /** Requests only. */
   url?: string;
   method?: string;
-  body?: { mimeType?: string; text?: string };
+  body?: { mimeType?: string; text?: string; params?: V5Pair[] };
   headers?: V5Pair[];
   parameters?: V5Pair[];
   pathParameters?: V5Pair[];
@@ -59,7 +59,7 @@ export interface ImportPayload {
   collections: Collection[];
   requests: ApiRequest[];
   environments: Environment[];
-  /** Perdas e conversões que o usuário precisa saber. */
+  /** Losses and conversions the user needs to know about. */
   warnings: string[];
 }
 
@@ -91,16 +91,28 @@ function toKeyValues(pairs: V5Pair[] | undefined, makeId: () => string): KeyValu
     }));
 }
 
+/** Insomnia form bodies carry their rows in `params`, not `text`. */
+function isForm(body: { mimeType?: string } | undefined): boolean {
+  return body?.mimeType?.includes("form-urlencoded") ?? false;
+}
+
+function bodyTypeOf(
+  body: { mimeType?: string; text?: string } | undefined,
+): ApiRequest["bodyType"] {
+  if (isForm(body)) return "form";
+  if (!body?.text) return "none";
+  return body.mimeType?.includes("json") ? "json" : "text";
+}
+
 /**
- * Importa um export v5 do Insomnia (arquivo YAML, `type: collection.insomnia.rest/5.0`).
- * Todo o export entra dentro de UMA collection nomeada pelo documento, e as
- * pastas aninhadas viram subpastas de verdade (`parentId`) — assim dois imports
- * não se misturam no mesmo nível da sidebar.
+ * Imports an Insomnia v5 export (YAML, `type: collection.insomnia.rest/5.0`):
+ * the whole file lands in ONE collection named after the document, nested
+ * folders becoming real subfolders so two imports never mix in the sidebar.
  */
 export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPayload {
   if (!isInsomniaV5(doc)) {
     throw new Error(
-      "Não parece um export v5 do Insomnia (esperava 'type: collection.insomnia.rest/5.0').",
+      "This does not look like an Insomnia v5 export (expected 'type: collection.insomnia.rest/5.0').",
     );
   }
 
@@ -110,7 +122,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
   const requests: ApiRequest[] = [];
   let literalTokens = 0;
 
-  // sortOrder é por pai, não global: cada nível tem a sua ordem.
+  // sortOrder is per parent, not global: each level has its own order.
   const nextSort = new Map<string, number>();
   const takeSort = (parentId: string | null) => {
     const key = parentId ?? "root";
@@ -119,13 +131,13 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
     return at;
   };
 
-  // Uma collection raiz por import: é ela que aparece na lista da sidebar.
+  // One root collection per import: it is what shows up in the sidebar list.
   const rootId = makeId();
   collections.push({
     id: rootId,
     projectId,
     parentId: null,
-    name: doc.name?.trim() || "Collection importada",
+    name: doc.name?.trim() || "Imported collection",
     sortOrder: takeSort(null),
     version: 1,
     updatedAt: now(),
@@ -134,7 +146,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
   const walk = (nodes: V5Node[], collectionId: string) => {
     for (const node of bySortKey(nodes)) {
       if (isFolder(node)) {
-        const name = node.name?.trim() || "Pasta importada";
+        const name = node.name?.trim() || "Imported folder";
         const id = makeId();
         collections.push({
           id,
@@ -149,8 +161,8 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
         continue;
       }
 
-      const name = node.name?.trim() || "Request importada";
-      // `:id` continua na URL: quem guarda o valor é `pathParams`.
+      const name = node.name?.trim() || "Imported request";
+      // `:id` stays in the URL: `pathParams` is what holds the value.
       const url = convertTemplates(node.url ?? "");
 
       const request: ApiRequest = {
@@ -163,16 +175,14 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
         headers: toKeyValues(node.headers, makeId),
         queryParams: toKeyValues(node.parameters, makeId),
         pathParams: toKeyValues(node.pathParameters, makeId),
-        body: node.body?.text ? convertTemplates(node.body.text) : null,
-        bodyType: node.body?.text
-          ? node.body.mimeType?.includes("json")
-            ? "json"
-            : "text"
-          : "none",
+        body: isForm(node.body) || !node.body?.text ? null : convertTemplates(node.body.text),
+        bodyType: bodyTypeOf(node.body),
         sortOrder: takeSort(collectionId),
         version: 1,
         updatedAt: now(),
       };
+
+      if (isForm(node.body)) request.formBody = toKeyValues(node.body?.params, makeId);
 
       const description = node.meta?.description?.trim();
       if (description) request.description = description;
@@ -190,7 +200,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
             password: convertTemplates(auth.password ?? ""),
           };
         } else if (auth.type && auth.type !== "none") {
-          warnings.push(`"${name}": auth do tipo "${auth.type}" não é suportada e foi ignorada.`);
+          warnings.push(`"${name}": "${auth.type}" auth is not supported and was ignored.`);
         }
       }
 
@@ -200,7 +210,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
 
   walk(doc.collection ?? [], rootId);
 
-  // Environments: o v5 traz um objeto base com subEnvironments dentro.
+  // Environments: v5 ships a base object with subEnvironments inside.
   const environments: Environment[] = [];
   const root = doc.environments;
   if (root) {
@@ -218,7 +228,7 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
       environments.push({
         id: makeId(),
         collectionId: rootId,
-        name: sub.name?.trim() || "env importado",
+        name: sub.name?.trim() || "imported env",
         isBase: false,
         color: sub.color ?? undefined,
         variables: toVariables(sub.data),
@@ -234,12 +244,12 @@ export function importInsomniaV5(doc: unknown, opts: ImportOptions): ImportPaylo
     .filter((v) => v.secret).length;
   if (secretCount > 0) {
     warnings.push(
-      `${secretCount} variável(is) de credencial foram marcadas como secretas — o valor fica só nesta máquina e não sobe no sync.`,
+      `${secretCount} credential variable(s) were marked as secret — the value stays on this machine and does not go up in the sync.`,
     );
   }
   if (literalTokens > 0) {
     warnings.push(
-      `${literalTokens} request(s) tinham token escrito direto no auth, sem variável. Considere movê-los para o environment.`,
+      `${literalTokens} request(s) had a token written straight into auth, with no variable. Consider moving them to the environment.`,
     );
   }
 

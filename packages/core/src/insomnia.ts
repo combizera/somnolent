@@ -5,7 +5,7 @@ import {
 } from "./insomniaCommon.js";
 import type { ApiRequest, Collection, Environment, KeyValue } from "./types.js";
 
-/** Forma mínima do export v4 do Insomnia que a gente consome. */
+/** Minimal shape of the Insomnia v4 export we consume. */
 interface InsomniaResource {
   _id: string;
   _type: string;
@@ -15,7 +15,12 @@ interface InsomniaResource {
   method?: string;
   headers?: { name: string; value: string; disabled?: boolean }[];
   parameters?: { name: string; value: string; disabled?: boolean }[];
-  body?: { mimeType?: string; text?: string };
+  body?: {
+    mimeType?: string;
+    text?: string;
+    /** Form bodies only: the key/value rows. */
+    params?: { name: string; value: string; disabled?: boolean }[];
+  };
   data?: Record<string, unknown>;
   color?: string | null;
   authentication?: { type?: string; token?: string; username?: string; password?: string };
@@ -41,10 +46,22 @@ function toKeyValues(
     }));
 }
 
+/** Insomnia form bodies carry their rows in `params`, not `text`. */
+function isForm(body: { mimeType?: string } | undefined): boolean {
+  return body?.mimeType?.includes("form-urlencoded") ?? false;
+}
+
+function bodyTypeOf(
+  body: { mimeType?: string; text?: string } | undefined,
+): ApiRequest["bodyType"] {
+  if (isForm(body)) return "form";
+  if (!body?.text) return "none";
+  return body.mimeType?.includes("json") ? "json" : "text";
+}
+
 /**
- * Importa um export v4 do Insomnia ("Export Data" → JSON).
- * Todo o export entra dentro de UMA collection (nomeada pelo workspace do
- * arquivo) e os grupos aninhados viram subpastas de verdade (`parentId`).
+ * Imports an Insomnia v4 export ("Export Data" → JSON): the whole file lands in
+ * ONE collection named after its workspace, nested groups becoming subfolders.
  */
 export function importInsomnia(
   json: unknown,
@@ -52,13 +69,13 @@ export function importInsomnia(
 ): InsomniaImport {
   const root = json as { __export_format?: number; resources?: InsomniaResource[] };
   if (!root || !Array.isArray(root.resources)) {
-    throw new Error("Não parece um export do Insomnia (esperava o campo 'resources').");
+    throw new Error("This does not look like an Insomnia export (expected the 'resources' field).");
   }
 
   const { projectId, makeId, now } = opts;
   const resources = root.resources;
 
-  // sortOrder é por pai, não global.
+  // sortOrder is per parent, not global.
   const nextSort = new Map<string, number>();
   const takeSort = (parentId: string) => {
     const at = nextSort.get(parentId) ?? 0;
@@ -68,26 +85,26 @@ export function importInsomnia(
 
   const collections: Collection[] = [];
 
-  // Uma collection raiz por import: é ela que aparece na lista da sidebar.
+  // One root collection per import: it is what shows up in the sidebar list.
   const workspaceResource = resources.find((r) => r._type === "workspace");
   const rootId = makeId();
   collections.push({
     id: rootId,
     projectId,
     parentId: null,
-    name: workspaceResource?.name?.trim() || "Collection importada",
+    name: workspaceResource?.name?.trim() || "Imported collection",
     sortOrder: 0,
     version: 1,
     updatedAt: now(),
   });
 
-  // Um id nosso por grupo do arquivo, antes de resolver os pais: um grupo pode
-  // aparecer no JSON antes do seu pai.
+  // One id of ours per group before resolving parents: a group can show up in
+  // the JSON before its own parent.
   const groupIds = new Map<string, string>();
   const groups = resources.filter((r) => r._type === "request_group");
   for (const r of groups) groupIds.set(r._id, makeId());
 
-  /** Pasta dona de um resource: o grupo pai, ou a collection raiz. */
+  /** Folder owning a resource: the parent group, or the root collection. */
   const ownerOf = (resource: InsomniaResource): string =>
     groupIds.get(resource.parentId ?? "") ?? rootId;
 
@@ -97,7 +114,7 @@ export function importInsomnia(
       id: groupIds.get(r._id)!,
       projectId,
       parentId,
-      name: r.name ?? "Pasta importada",
+      name: r.name ?? "Imported folder",
       sortOrder: takeSort(parentId),
       version: 1,
       updatedAt: now(),
@@ -113,21 +130,18 @@ export function importInsomnia(
       id: makeId(),
       projectId,
       collectionId: owner,
-      name: r.name ?? "Request importada",
+      name: r.name ?? "Imported request",
       method: toMethod(r.method),
       url: convertTemplates(r.url ?? ""),
       headers: toKeyValues(r.headers, makeId),
       queryParams: toKeyValues(r.parameters, makeId),
-      body: r.body?.text ? convertTemplates(r.body.text) : null,
-      bodyType: r.body?.text
-        ? r.body.mimeType?.includes("json")
-          ? "json"
-          : "text"
-        : "none",
+      body: isForm(r.body) || !r.body?.text ? null : convertTemplates(r.body.text),
+      bodyType: bodyTypeOf(r.body),
       sortOrder: takeSort(owner),
       version: 1,
       updatedAt: now(),
     };
+    if (isForm(r.body)) request.formBody = toKeyValues(r.body?.params, makeId);
     if (auth.type === "bearer" && auth.token) {
       request.auth = { type: "bearer", token: convertTemplates(auth.token) };
     } else if (auth.type === "basic" && (auth.username || auth.password)) {
@@ -140,7 +154,7 @@ export function importInsomnia(
     requests.push(request);
   }
 
-  // Environments: o base tem parentId = workspace; os filhos do base viram nossos envs.
+  // Environments: the base hangs off the workspace; its children become ours.
   const environments: Environment[] = [];
   const envResources = resources.filter((r) => r._type === "environment");
   const workspaceIds = new Set(resources.filter((r) => r._type === "workspace").map((r) => r._id));
@@ -164,7 +178,7 @@ export function importInsomnia(
     environments.push({
       id: makeId(),
       collectionId: rootId,
-      name: r.name ?? "env importado",
+      name: r.name ?? "imported env",
       isBase: false,
       color: r.color ?? undefined,
       variables: toVariables(r.data),

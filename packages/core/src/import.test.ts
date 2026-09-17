@@ -44,6 +44,23 @@ const insomniaExport = {
       authentication: { type: "bearer", token: "{{ _.token }}" },
     },
     {
+      _id: "req_3",
+      _type: "request",
+      parentId: "wrk_1",
+      name: "Token",
+      method: "POST",
+      url: "{{ _.base_url }}/oauth/token",
+      headers: [],
+      body: {
+        mimeType: "application/x-www-form-urlencoded",
+        params: [
+          { name: "grant_type", value: "client_credentials" },
+          { name: "client_id", value: "{{ _.client_id }}" },
+          { name: "scope", value: "read", disabled: true },
+        ],
+      },
+    },
+    {
       _id: "env_base",
       _type: "environment",
       parentId: "wrk_1",
@@ -64,17 +81,17 @@ const insomniaExport = {
 describe("importInsomnia", () => {
   const result = importInsomnia(insomniaExport, opts);
 
-  it("põe tudo numa collection raiz com o nome do workspace do arquivo", () => {
+  it("puts everything in a root collection named after the file workspace", () => {
     const roots = result.collections.filter((c) => c.parentId === null);
     expect(roots).toHaveLength(1);
     expect(roots[0]?.name).toBe("Meu projeto");
 
-    // request solta no workspace cai na raiz
+    // a request loose in the workspace lands in the root
     const create = result.requests.find((r) => r.name === "Criar cliente")!;
     expect(create.collectionId).toBe(roots[0]?.id);
   });
 
-  it("preserva grupos aninhados como subpastas", () => {
+  it("keeps nested groups as subfolders", () => {
     const root = result.collections.find((c) => c.parentId === null)!;
     const clientes = result.collections.find((c) => c.name === "Clientes")!;
     const aninhada = result.collections.find((c) => c.name === "Aninhada")!;
@@ -82,12 +99,12 @@ describe("importInsomnia", () => {
     expect(clientes.parentId).toBe(root.id);
     expect(aninhada.parentId).toBe(clientes.id);
 
-    // a request vivia no grupo mais profundo e continua nele
+    // the request lived in the deepest group and stays there
     const req = result.requests.find((r) => r.name === "Listar clientes")!;
     expect(req.collectionId).toBe(aninhada.id);
   });
 
-  it("converte {{ _.var }} pra {{ var }} em url, headers e body", () => {
+  it("converts {{ _.var }} to {{ var }} in url, headers and body", () => {
     const list = result.requests.find((r) => r.name === "Listar clientes")!;
     expect(list.url).toBe("{{ base_url }}/v1/clients");
     expect(list.headers[0]?.value).toBe("Bearer {{ token }}");
@@ -97,7 +114,19 @@ describe("importInsomnia", () => {
     expect(create.bodyType).toBe("json");
   });
 
-  it("preserva headers desabilitados e auth bearer", () => {
+  it("a form body becomes bodyType form with the rows in formBody", () => {
+    const token = result.requests.find((r) => r.name === "Token")!;
+    expect(token.bodyType).toBe("form");
+    // Text stays null: a form is its rows.
+    expect(token.body).toBeNull();
+    expect(token.formBody).toEqual([
+      { id: expect.any(String), key: "grant_type", value: "client_credentials", enabled: true },
+      { id: expect.any(String), key: "client_id", value: "{{ client_id }}", enabled: true },
+      { id: expect.any(String), key: "scope", value: "read", enabled: false },
+    ]);
+  });
+
+  it("keeps disabled headers and bearer auth", () => {
     const list = result.requests.find((r) => r.name === "Listar clientes")!;
     expect(list.headers[1]).toMatchObject({ key: "X-Off", enabled: false });
 
@@ -105,7 +134,7 @@ describe("importInsomnia", () => {
     expect(create.auth).toEqual({ type: "bearer", token: "{{ token }}" });
   });
 
-  it("mapeia base environment e sub-environments (com data aninhado achatado)", () => {
+  it("maps base environment and sub-environments (nested data flattened)", () => {
     const base = result.environments.find((e) => e.isBase)!;
     expect(base.variables).toEqual([
       { key: "page_size", value: "20", secret: false, enabled: true },
@@ -114,7 +143,7 @@ describe("importInsomnia", () => {
     const stg = result.environments.find((e) => !e.isBase)!;
     expect(stg.name).toBe("Staging");
     expect(stg.color).toBe("#f59e0b");
-    // Chaves de credencial entram marcadas como secretas (valor não sobe no sync).
+    // Credential keys come in marked as secret (the value never goes up in the sync).
     expect(stg.variables).toContainEqual({
       key: "nested.token",
       value: "abc",
@@ -123,13 +152,13 @@ describe("importInsomnia", () => {
     });
   });
 
-  it("rejeita JSON que não é export do Insomnia", () => {
+  it("rejects JSON that is not an Insomnia export", () => {
     expect(() => importInsomnia({ foo: 1 }, opts)).toThrow(/resources/);
   });
 });
 
 describe("parseCurl", () => {
-  it("parseia método, headers, body e URL", () => {
+  it("parses method, headers, body and URL", () => {
     const parsed = parseCurl(
       `curl -X POST 'https://api.com/v1/users' -H 'Content-Type: application/json' -H 'Authorization: Bearer abc' -d '{"name":"Ana"}'`,
     );
@@ -143,23 +172,23 @@ describe("parseCurl", () => {
     expect(parsed.bodyType).toBe("json");
   });
 
-  it("-d sem -X vira POST; sem nada vira GET", () => {
+  it("-d without -X becomes POST; nothing at all becomes GET", () => {
     expect(parseCurl("curl https://a.com -d x=1").method).toBe("POST");
     expect(parseCurl("curl https://a.com").method).toBe("GET");
   });
 
-  it("suporta continuação de linha com \\ e aspas duplas", () => {
+  it("supports line continuation with \\ and double quotes", () => {
     const parsed = parseCurl('curl "https://a.com/x" \\\n  -H "X-A: 1"');
     expect(parsed.url).toBe("https://a.com/x");
     expect(parsed.headers).toEqual([{ key: "X-A", value: "1" }]);
   });
 
-  it("-u vira header Basic", () => {
+  it("-u becomes a Basic header", () => {
     const parsed = parseCurl("curl https://a.com -u user:pass");
     expect(parsed.headers[0]?.value).toBe(`Basic ${btoa("user:pass")}`);
   });
 
-  it("rejeita comando que não é curl", () => {
+  it("rejects a command that is not curl", () => {
     expect(() => parseCurl("wget https://a.com")).toThrow(/curl/);
   });
 });
@@ -192,7 +221,7 @@ describe("toCurl + auth helper", () => {
     updatedAt: "2026-08-04T00:00:00.000Z",
   };
 
-  it("auth bearer gera header Authorization resolvido", () => {
+  it("bearer auth builds a resolved Authorization header", () => {
     const resolved = resolveRequest(request, null, env);
     expect(resolved.headers).toContainEqual({
       key: "Authorization",
@@ -200,7 +229,7 @@ describe("toCurl + auth helper", () => {
     });
   });
 
-  it("header Authorization manual tem precedência sobre o auth helper", () => {
+  it("a manual Authorization header wins over the auth helper", () => {
     const withManual: ApiRequest = {
       ...request,
       headers: [{ id: "h1", key: "Authorization", value: "custom", enabled: true }],
@@ -211,7 +240,7 @@ describe("toCurl + auth helper", () => {
     ]);
   });
 
-  it("auth basic gera base64 de user:pass", () => {
+  it("basic auth builds base64 of user:pass", () => {
     const basic: ApiRequest = {
       ...request,
       auth: { type: "basic", username: "ana", password: "s3nha" },
@@ -223,7 +252,7 @@ describe("toCurl + auth helper", () => {
     });
   });
 
-  it("gera curl com headers e body escapados", () => {
+  it("builds curl with escaped headers and body", () => {
     const resolved = resolveRequest(request, null, env);
     const cmd = toCurl(resolved);
     expect(cmd).toContain("curl -X POST 'https://api.com/login'");
@@ -231,7 +260,7 @@ describe("toCurl + auth helper", () => {
     expect(cmd).toContain(`-d '{"a":1}'`);
   });
 
-  it("a query da URL vira linhas de param, e a URL fica limpa", () => {
+  it("the URL query becomes param rows, and the URL is left clean", () => {
     const parsed = parseCurl(
       "curl 'https://captura-djen.munin.ia.br/api/v1/communications?:status=all&tracker_id=16853&per_page=100'",
     );
@@ -243,11 +272,11 @@ describe("toCurl + auth helper", () => {
     ]);
   });
 
-  it("curl sem query não ganha param nenhum", () => {
+  it("a curl with no query gains no param", () => {
     expect(parseCurl("curl https://a.com/x").queryParams).toEqual([]);
   });
 
-  it("curl → parse → curl é estável", () => {
+  it("curl → parse → curl is stable", () => {
     const resolved = resolveRequest(request, null, env);
     const reparsed = parseCurl(toCurl(resolved));
     expect(reparsed.method).toBe("POST");
