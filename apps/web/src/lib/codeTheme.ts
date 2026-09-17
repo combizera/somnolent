@@ -2,10 +2,7 @@ import { EditorView } from '@codemirror/view'
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
 
-/**
- * Tema dos editores de código. As cores saem das variáveis do `@theme` em
- * index.css — a paleta continua definida num lugar só.
- */
+/** Colors come from the `@theme` vars in index.css, so the palette stays in one place. */
 const surface = EditorView.theme(
   {
     '&': { color: 'var(--color-ink)', backgroundColor: 'transparent' },
@@ -18,12 +15,8 @@ const surface = EditorView.theme(
   { dark: true },
 )
 
-/**
- * Chave e valor em cores diferentes — é o que faz um JSON grande ser legível.
- * As tags vêm do @lezer/json: PropertyName é a chave, String/Number/True/False/
- * Null são os valores, e vírgula/dois-pontos/chaves ficam apagados pra não
- * competir com o conteúdo.
- */
+/** Key and value in different colors is what makes a large JSON readable;
+ *  punctuation stays dim so it does not compete with the content. */
 const jsonStyle = HighlightStyle.define(
   [
     { tag: t.propertyName, color: 'var(--color-syn-key)' },
@@ -36,5 +29,5 @@ const jsonStyle = HighlightStyle.define(
   { themeType: 'dark' },
 )
 
-/** Passe junto das extensions e use `theme="none"` pra nada competir com isto. */
+/** Pass with the extensions and use `theme="none"` so nothing competes with this. */
 export const codeTheme = [surface, syntaxHighlighting(jsonStyle)]

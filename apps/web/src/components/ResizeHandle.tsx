@@ -1,33 +1,29 @@
 import { useEffect, useRef } from 'react'
 
 interface Props {
-  /** Rótulo pra leitor de tela, ex.: "Largura da sidebar". */
+  /** Screen-reader label, e.g. "Sidebar width". */
   label: string
-  /** Recebe o clientX do ponteiro; quem passa converte em largura. */
+  /** Gets the pointer's clientX; the caller turns it into a width. */
   onDrag: (clientX: number) => void
-  /** Teclado: passo em px, sinalizado (← negativo, → positivo). */
+  /** Keyboard: signed step in px (← negative, → positive). */
   onStep: (deltaPx: number) => void
-  /** Duplo clique volta ao default. */
+  /** Double click restores the default. */
   onReset: () => void
-  /** Posição no grid de quem usa — o divisor não sabe onde ele mora. */
+  /** Grid position from the caller — the divider does not know where it lives. */
   style?: React.CSSProperties
 }
 
-/** Passo do teclado; com Shift anda mais rápido. */
+/** Keyboard step; Shift moves faster. */
 const STEP = 16
 const STEP_FAST = 64
 
-/**
- * Divisor arrastável entre dois painéis. É um grid item de 5px, então não
- * precisa de posicionamento absoluto nem de cálculo de offset — a área de
- * clique é a coluna inteira, e o traço visível é o ::after de 1px.
- */
+/** Draggable divider between two panels. A 5px grid item, so no absolute
+ *  positioning is needed: the hit area is the whole column. */
 export function ResizeHandle({ label, onDrag, onStep, onReset, style }: Props) {
   const dragging = useRef(false)
 
-  // Desmontar no meio do arraste (trocar de request, por exemplo) nunca dispara
-  // o pointerup — e sem esta limpeza a classe fica no body e o app inteiro
-  // continua com o cursor de redimensionar.
+  // Unmounting mid-drag never fires pointerup, and without this cleanup the
+  // class stays on the body and the whole app keeps the resize cursor.
   useEffect(
     () => () => {
       document.body.classList.remove('is-resizing')
@@ -43,7 +39,7 @@ export function ResizeHandle({ label, onDrag, onStep, onReset, style }: Props) {
       tabIndex={0}
       style={style}
       onPointerDown={(e) => {
-        // Só botão principal: com o direito o menu de contexto rouba o pointerup.
+        // Primary button only: the context menu would steal the pointerup.
         if (e.button !== 0) return
         dragging.current = true
         e.currentTarget.setPointerCapture(e.pointerId)
@@ -54,7 +50,7 @@ export function ResizeHandle({ label, onDrag, onStep, onReset, style }: Props) {
         onDrag(e.clientX)
       }}
       onPointerUp={(e) => {
-        // Sem o guard, um pointerup sem captura correspondente joga exceção.
+        // Without the guard, a pointerup with no matching capture throws.
         if (!dragging.current) return
         dragging.current = false
         e.currentTarget.releasePointerCapture(e.pointerId)
@@ -78,7 +74,7 @@ export function ResizeHandle({ label, onDrag, onStep, onReset, style }: Props) {
           onReset()
         }
       }}
-      title={`${label} — arraste, duplo clique para o padrão`}
+      title={`${label} — drag, double click for the default`}
       className="group relative cursor-col-resize touch-none select-none bg-transparent
                  after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2
                  after:bg-line after:transition-colors

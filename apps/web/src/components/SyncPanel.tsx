@@ -19,12 +19,12 @@ function useSyncStatus() {
   return status
 }
 
-/** O botão perdeu o texto, então o estado precisa estar no title. */
+/** The button lost its text, so the state has to live in the title. */
 const STATUS_TITLE: Record<SyncStatus, string> = {
-  off: 'Sync desligado — clique para conectar',
-  syncing: 'Sincronizando…',
-  ok: 'Sync em dia — clique para ver e compartilhar',
-  error: 'Sync com erro — clique para ver',
+  off: 'Sync off — click to connect',
+  syncing: 'Syncing…',
+  ok: 'Sync up to date — click to view and share',
+  error: 'Sync failing — click to view',
 }
 
 const STATUS_DOT: Record<SyncStatus, string> = {
@@ -34,10 +34,8 @@ const STATUS_DOT: Record<SyncStatus, string> = {
   error: 'bg-bad',
 }
 
-/**
- * Chave que veio no link que abriu o app. Some da barra de endereço assim que
- * é lida — chave em histórico de navegador é chave vazada.
- */
+/** Key that came in the link which opened the app. It leaves the address bar as
+ *  soon as it is read — a key in browser history is a leaked key. */
 function takeKeyFromUrl(): string {
   const match = window.location.hash.match(/^#k=(somn_[\w-]+)/)
   if (!match) return ''
@@ -45,7 +43,7 @@ function takeKeyFromUrl(): string {
   return match[1]!
 }
 
-/** Sem conexão: criar um project novo ou entrar com uma chave existente. */
+/** No connection: create a new project or join with an existing key. */
 function Connect() {
   const connect = useStore((s) => s.connect)
   const adoptRemoteProject = useStore((s) => s.adoptRemoteProject)
@@ -63,7 +61,7 @@ function Connect() {
     try {
       await fn()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Não consegui falar com o servidor.')
+      setError(err instanceof ApiError ? err.message : 'Could not reach the server.')
     } finally {
       setBusy(false)
     }
@@ -74,17 +72,17 @@ function Connect() {
       <div>
         <h2 className="text-sm font-semibold text-ink">Sync</h2>
         <p className="text-sm leading-relaxed text-ink-faint">
-          Sem conta e sem senha: a chave é a credencial. Variáveis secretas continuam só nesta
-          máquina — nem o servidor nem quem receber o link enxerga o valor delas.
+          No account and no password: the key is the credential. Secret variables stay on this
+          machine — neither the server nor whoever gets the link sees their values.
         </p>
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className={label}>Entrar com uma chave</p>
+        <p className={label}>Join with a key</p>
         <input
           value={key}
           onChange={(e) => setKey(e.target.value)}
-          placeholder="Cole o link ou a chave somn_…"
+          placeholder="Paste the link or the somn_… key"
           spellCheck={false}
           className={`${inputClass} font-mono text-sm`}
         />
@@ -93,12 +91,11 @@ function Connect() {
           onClick={() =>
             void run(async () => {
               const raw = key.trim().split('#k=').pop()!.trim()
-              // Valida a chave ANTES de tocar em qualquer coisa: apagar primeiro
-              // significaria perder o workspace por causa de uma chave com typo.
+              // Validate the key BEFORE touching anything: clearing first would
+              // cost the whole workspace over a typo.
               const info = await api.me(raw)
-              // Entrar num project de outra pessoa: ele nasce local com o id do
-              // servidor e o primeiro pull traz o conteúdo. Os outros projects
-              // desta máquina não são tocados.
+              // Joining someone else's project: it starts local with the server
+              // id, and the first pull brings the content.
               enterRemoteProject(info.project)
               connect(raw, {
                 scope: info.scope,
@@ -112,22 +109,22 @@ function Connect() {
           }
           className="w-fit rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-hi disabled:opacity-40"
         >
-          Conectar
+          Connect
         </button>
       </div>
 
       <div className="flex flex-col gap-2 border-t border-line pt-4">
-        <p className={label}>Ou criar um project novo</p>
+        <p className={label}>Or create a new project</p>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Nome do project"
+          placeholder="Project name"
           className={inputClass}
         />
         <input
           value={createToken}
           onChange={(e) => setCreateToken(e.target.value)}
-          placeholder="Segredo do servidor (só se ele exigir)"
+          placeholder="Server secret (only if it requires one)"
           className={`${inputClass} text-sm`}
         />
         <button
@@ -135,14 +132,13 @@ function Connect() {
           onClick={() =>
             void run(async () => {
               const res = await api.createProject(name.trim(), createToken.trim() || undefined)
-              // Conecta na hora: a chave fica guardada nesta máquina e é ela
-              // que emite as dos outros. Mostrar a chave e esperar que a pessoa
-              // a salvasse deixava o project órfão se ela fechasse o modal.
+              // Connect right away: the key is stored here and issues the others.
+              // Showing it and hoping it got saved orphaned the project.
               adoptRemoteProject({ id: res.id, name: res.name })
               connect(res.key, {
                 scope: 'project',
                 role: 'write',
-                label: 'Esta máquina',
+                label: 'This machine',
                 projectId: res.id,
                 projectName: res.name,
                 collectionId: null,
@@ -152,7 +148,7 @@ function Connect() {
           className="flex w-fit items-center gap-1.5 rounded-md border border-line px-4 py-2 text-sm text-ink-dim transition hover:bg-raised hover:text-ink disabled:opacity-40"
         >
           <Plus className="size-3.5" />
-          Criar project
+          Create project
         </button>
       </div>
 
@@ -161,25 +157,22 @@ function Connect() {
   )
 }
 
-/** "13:35:02" não diz se foi agora ou ontem. Isto diz, e numa frase inteira. */
+/** "13:35:02" does not say whether it was now or yesterday. This does, in a sentence. */
 function lastSyncLabel(iso: string | null): string {
-  if (!iso) return 'Ainda não sincronizou'
+  if (!iso) return 'Not synced yet'
   const date = new Date(iso)
   const ms = Date.now() - date.getTime()
-  if (ms < 60_000) return 'Sincronizado agora mesmo'
+  if (ms < 60_000) return 'Synced just now'
   const min = Math.floor(ms / 60_000)
-  if (min < 60) return `Sincronizado há ${min} min`
+  if (min < 60) return `Synced ${min} min ago`
   const hora = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   return date.toDateString() === new Date().toDateString()
-    ? `Sincronizado hoje às ${hora}`
-    : `Sincronizado em ${date.toLocaleDateString('pt-BR')}, ${hora}`
+    ? `Synced today at ${hora}`
+    : `Synced on ${date.toLocaleDateString('pt-BR')}, ${hora}`
 }
 
-/**
- * Um fato da conexão: ícone + texto, sem rótulo — o ícone é o rótulo.
- * `fixo` protege os fatos de texto conhecido; quem cede espaço numa janela
- * apertada é só o rótulo da chave, que é o único de tamanho imprevisível.
- */
+/** One connection fact: icon + text, no label — the icon is the label. `fixo`
+ *  protects the known-text facts; only the key label gives up room. */
 function Fact({
   icon,
   fixo = false,
@@ -197,7 +190,7 @@ function Fact({
   )
 }
 
-/** Conectado: estado, chaves emitidas e o botão de compartilhar. */
+/** Connected: state, issued keys and the share button. */
 function Connected() {
   const connection = useStore((s) => s.connection)
   const disconnect = useStore((s) => s.disconnect)
@@ -216,7 +209,7 @@ function Connected() {
     api
       .listKeys(key)
       .then((r) => setKeys(r.keys))
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Falha ao listar chaves.'))
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not list the keys.'))
   }
   useEffect(load, [key])
 
@@ -230,8 +223,8 @@ function Connected() {
               <span className="truncate">{connection.projectName}</span>
             </h2>
 
-            {/* Tudo abaixo alinha na mesma sangria do nome do project — a bolinha
-                tem 8px e o gap 8px, então pl-4. É esse prumo que faltava. */}
+            {/* Everything below lines up with the project name: the dot is 8px
+                and the gap 8px, hence pl-4. */}
             <p className="mt-1 pl-4 text-sm text-ink-faint" title={lastSyncAt ?? undefined}>
               {lastSyncLabel(lastSyncAt)}
             </p>
@@ -241,13 +234,12 @@ function Connected() {
             onClick={() => void syncNow()}
             className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
           >
-            Sincronizar agora
+            Sync now
           </button>
         </div>
 
-        {/* Linha própria, e não a coluna que divide espaço com o botão: ali
-            sobravam ~300px e os três fatos quebravam em duas linhas.
-            Sem `flex-wrap` — quem cede é o rótulo da chave, que trunca. */}
+        {/* Its own row, not the column that shares space with the button: there
+            the three facts broke into two lines. */}
         <div className="flex items-center gap-4 overflow-hidden pl-4 text-sm text-ink-dim">
           <Fact
             fixo
@@ -259,7 +251,7 @@ function Connected() {
               )
             }
           >
-            {connection.scope === 'collection' ? 'Uma collection' : 'Project inteiro'}
+            {connection.scope === 'collection' ? 'One collection' : 'Whole project'}
           </Fact>
 
           <Fact
@@ -272,7 +264,7 @@ function Connected() {
               )
             }
           >
-            {readOnly ? 'Somente leitura' : 'Leitura e escrita'}
+            {readOnly ? 'Read only' : 'Read and write'}
           </Fact>
 
           <Fact icon={<KeyRound aria-hidden className="size-3.5" />}>{connection.label}</Fact>
@@ -281,8 +273,8 @@ function Connected() {
 
       {readOnly && (
         <p className="rounded-md border-l-2 border-warn bg-warn/10 px-3 py-2 text-sm leading-relaxed text-ink-dim">
-          Esta chave só lê. Suas edições ficam nesta máquina e não sobem — peça uma chave de
-          escrita a quem compartilhou.
+          This key only reads. Your edits stay on this machine and never go up — ask whoever
+          shared it for a write key.
         </p>
       )}
 
@@ -292,16 +284,16 @@ function Connected() {
           className="flex w-fit items-center gap-1.5 rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-hi"
         >
           <Link2 className="size-3.5" />
-          Compartilhar
+          Share
         </button>
       )}
 
       <div className="flex flex-col gap-2 border-t border-line pt-4">
-        <p className={label}>Chaves ativas</p>
-        {keys === null && <p className="text-sm text-ink-faint">Carregando…</p>}
-        {keys?.length === 0 && <p className="text-sm text-ink-faint">Nenhuma chave ainda.</p>}
-        {/* Teto + scroll: um project com muitas chaves empurrava o botão de
-            desconectar pra fora do modal. */}
+        <p className={label}>Active keys</p>
+        {keys === null && <p className="text-sm text-ink-faint">Loading…</p>}
+        {keys?.length === 0 && <p className="text-sm text-ink-faint">No keys yet.</p>}
+        {/* Cap + scroll: a project with many keys pushed the disconnect button
+            out of the modal. */}
         <div className="flex max-h-56 flex-col gap-1 overflow-y-auto pr-1">
           {keys?.map((k) => (
             <div
@@ -312,26 +304,26 @@ function Connected() {
               <span className="min-w-0 flex-1 truncate text-ink">{k.label}</span>
               {k.mine && (
                 <span className="shrink-0 rounded bg-brand-soft px-1.5 py-0.5 text-xs text-brand-hi">
-                  Esta máquina
+                  This machine
                 </span>
               )}
               <span className="shrink-0 text-xs text-ink-faint">
                 {k.scope === 'collection' ? 'Collection' : 'Project'} ·{' '}
-                {k.role === 'read' ? 'Leitura' : 'Escrita'}
+                {k.role === 'read' ? 'Read' : 'Write'}
               </span>
               <span
                 className="shrink-0 text-xs text-ink-faint"
-                title={k.lastUsedAt ? 'Último uso desta chave' : 'Esta chave nunca foi usada'}
+                title={k.lastUsedAt ? 'Last use of this key' : 'This key has never been used'}
               >
-                {k.lastUsedAt ? `Usada ${new Date(k.lastUsedAt).toLocaleDateString('pt-BR')}` : '—'}
+                {k.lastUsedAt ? `Used ${new Date(k.lastUsedAt).toLocaleDateString('pt-BR')}` : '—'}
               </span>
               {!readOnly && !k.mine && (
                 <button
                   onClick={async () => {
                     const ok = await confirm({
-                      title: `Revogar a chave "${k.label}"?`,
-                      message: 'Quem estiver usando ela perde o acesso na hora, sem aviso.',
-                      confirmLabel: 'Revogar',
+                      title: `Revoke the key "${k.label}"?`,
+                      message: 'Whoever is using it loses access at once, with no warning.',
+                      confirmLabel: 'Revoke',
                       danger: true,
                     })
                     if (!ok) return
@@ -339,12 +331,12 @@ function Connected() {
                       .revokeKey(key, k.id)
                       .then(load)
                       .catch((err) =>
-                        setError(err instanceof ApiError ? err.message : 'Falha ao revogar.'),
+                        setError(err instanceof ApiError ? err.message : 'Could not revoke it.'),
                       )
                   }}
                   className="shrink-0 text-ink-faint transition hover:text-bad"
-                  title="Revogar chave"
-                  aria-label="Revogar chave"
+                  title="Revoke key"
+                  aria-label="Revoke key"
                 >
                   <Trash2 className="size-3.5" />
                 </button>
@@ -360,17 +352,17 @@ function Connected() {
         <button
           onClick={async () => {
             const ok = await confirm({
-              title: 'Desconectar esta máquina?',
+              title: 'Disconnect this machine?',
               message:
-                'As collections continuam aqui, mas param de sincronizar. A chave é esquecida nesta máquina — para voltar você precisa dela de novo, e ela não é mostrada outra vez.',
-              confirmLabel: 'Desconectar',
+                'The collections stay here but stop syncing. The key is forgotten on this machine — coming back needs it again, and it is never shown twice.',
+              confirmLabel: 'Disconnect',
               danger: true,
             })
             if (ok) disconnect()
           }}
           className="w-full rounded-md border border-line px-3 py-2.5 text-sm font-medium text-ink-dim transition hover:border-bad/40 hover:bg-bad/10 hover:text-bad"
         >
-          Desconectar esta máquina
+          Disconnect this machine
         </button>
       </div>
     </div>
@@ -379,7 +371,7 @@ function Connected() {
 
 export function SyncPanel() {
   const connection = useStore((s) => s.connection)
-  // Abriu pelo link compartilhado? Já mostra o painel com a chave preenchida.
+  // Opened from a shared link? Show the panel with the key already filled in.
   const [open, setOpen] = useState(
     () => !connection.key && window.location.hash.startsWith('#k='),
   )
@@ -387,8 +379,8 @@ export function SyncPanel() {
 
   return (
     <>
-      {/* Só o estado: o nome do project já está no ProjectSelector ao lado, e
-          repetir os dois é o que fazia o header parecer cheio. */}
+      {/* State only: the project name is already in the ProjectSelector next to
+          it, and repeating both is what made the header feel crowded. */}
       <button
         onClick={() => setOpen(true)}
         className={headerButton}
@@ -396,8 +388,8 @@ export function SyncPanel() {
         aria-label={STATUS_TITLE[status]}
       >
         <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[status]}`} />
-        {/* O rótulo fica: uma bolinha sozinha não se anuncia como botão. O que
-            não volta é o nome do project, que já está no seletor ao lado. */}
+        {/* The label stays: a lone dot does not announce itself as a button.
+            What does not come back is the project name. */}
         <span className="text-sm">Sync</span>
         {connection.role === 'read' && <Eye aria-hidden className="size-3 text-ink-faint" />}
       </button>

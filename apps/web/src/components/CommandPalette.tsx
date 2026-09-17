@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, Search } from 'lucide-react'
 import { useStore } from '../store'
 import { MethodChip } from './MethodChip'
 
-/** Busca global (Ctrl/Cmd+K): filtra requests por nome, URL e método. */
+/** Global search (Ctrl/Cmd+K): filters requests by name, URL and method. */
 export function CommandPalette() {
   const requests = useStore((s) => s.requests)
   const collections = useStore((s) => s.collections)
@@ -80,13 +80,13 @@ export function CommandPalette() {
             }
             if (e.key === 'Enter' && results[cursor]) pick(results[cursor].id)
           }}
-            placeholder="Buscar request por nome, URL ou método…"
+            placeholder="Search requests by name, URL or method…"
             className="w-full bg-transparent py-3 text-sm text-ink placeholder:text-ink-faint focus:outline-none"
           />
         </div>
         <div className="max-h-72 overflow-y-auto p-1">
           {results.length === 0 && (
-            <p className="px-3 py-4 text-sm text-ink-faint">Nada encontrado.</p>
+            <p className="px-3 py-4 text-sm text-ink-faint">Nothing found.</p>
           )}
           {results.map((r, i) => {
             const folder = collections.find((c) => c.id === r.collectionId)?.name
@@ -109,7 +109,7 @@ export function CommandPalette() {
         <p className="flex items-center gap-1 border-t border-line px-4 py-2 text-[10px] text-ink-faint">
           <ArrowUp aria-hidden className="size-3" />
           <ArrowDown aria-hidden className="size-3" />
-          navega · Enter abre · Esc fecha
+          to move · Enter opens · Esc closes
         </p>
       </div>
     </div>

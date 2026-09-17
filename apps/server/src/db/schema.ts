@@ -9,7 +9,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 
-/** Project: o nível de topo, dono das collections. Era `workspaces`. */
+/** Project: the top level, owner of the collections. Was `workspaces`. */
 export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
@@ -17,23 +17,20 @@ export const projects = pgTable('projects', {
 })
 
 /**
- * Chave de acesso — a credencial. Não existe conta: quem tem a chave sincroniza
- * o que ela abre. Várias chaves por alvo, cada uma com rótulo e papel, pra dar
- * revogação por pessoa sem cadastrar pessoa.
- *
- * O valor cru só existe no momento da criação; aqui fica o sha-256.
+ * Access key — the credential. No accounts: whoever holds the key syncs what it
+ * opens. Only the sha-256 is stored; the raw value exists at creation only.
  */
 export const accessKeys = pgTable(
   'access_keys',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     tokenHash: text('token_hash').notNull().unique(),
-    /** 'project' abre o project inteiro; 'collection' abre uma collection só. */
+    /** 'project' opens the whole project; 'collection' opens a single one. */
     scope: text('scope', { enum: ['project', 'collection'] }).notNull(),
     projectId: uuid('project_id')
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
-    /** Preenchido só quando scope = 'collection'. */
+    /** Only filled when scope = 'collection'. */
     collectionId: text('collection_id'),
     role: text('role', { enum: ['write', 'read'] }).notNull().default('write'),
     label: text('label').notNull(),
@@ -52,8 +49,8 @@ export const entities = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
     /**
-     * Collection raiz dona da entidade — é o filtro que uma chave de escopo
-     * 'collection' usa. A própria collection raiz aponta pro próprio id.
+     * Root collection owning the entity — the filter a 'collection'-scoped key
+     * uses. The root collection itself points at its own id.
      */
     rootCollectionId: text('root_collection_id'),
     kind: text('kind', { enum: ['collection', 'request', 'environment'] }).notNull(),

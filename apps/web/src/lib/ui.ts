@@ -1,45 +1,35 @@
-/** Classes e helpers de UI compartilhados pelos diálogos. */
+/** UI classes and helpers shared by the dialogs. */
 
-/**
- * Base de todo controle de formulário. A altura é fixa de propósito: input e
- * select têm métricas internas diferentes, e sem `h-9` os dois nunca fecham
- * na mesma linha.
- */
+/** Base for every form control. The height is fixed on purpose: input and select
+ *  have different internal metrics and would never line up without it. */
 export const controlClass =
   'h-9 w-full rounded-md border border-line bg-app px-3 text-sm text-ink transition focus:border-brand focus:outline-none'
 
 export const inputClass = `${controlClass} placeholder:text-ink-faint`
 
-/**
- * `appearance-none` não é detalhe: sem ele o navegador desenha o select nativo
- * — fundo quase preto e seta própria — ao lado de inputs no tom do app.
- * O chevron vem sobreposto pelo componente `Select`.
- */
+/** Without `appearance-none` the browser draws its native select next to inputs
+ *  in the app's tone; `Select` overlays the chevron. */
 export const selectClass = `${controlClass} cursor-pointer appearance-none pr-8 hover:border-line-soft`
 
 export const fieldLabel = 'text-xs font-semibold tracking-wider text-ink-faint uppercase'
 
-/**
- * Controles do header. Mesma altura `h-9` dos controles de diálogo, pelo mesmo
- * motivo: select, botão de ícone e bolinha de status têm métricas internas
- * diferentes e, sem altura fixa, cada um fecha num tamanho na mesma linha.
- * A altura mora aqui — se cada componente definir a sua, elas divergem de novo.
- */
+/** Header controls share the dialog controls' `h-9` for the same reason, and the
+ *  height lives here: per-component heights would drift apart again. */
 export const headerGroup =
   'flex h-9 items-stretch overflow-hidden rounded-md border border-line focus-within:border-brand'
 
-/** Botão solto do header, quadrado, só ícone. */
+/** Standalone header button: square, icon only. */
 export const headerButton =
   'flex h-9 items-center justify-center gap-1.5 rounded-md border border-line bg-panel px-2 text-ink-dim transition hover:bg-raised hover:text-ink'
 
-/** Trecho do grupo que abriga ícone + select. O respiro à esquerda é o que
- *  separa o conteúdo da borda do grupo. */
+/** Slice of the group holding icon + select; the left breathing room is what
+ *  separates content from the group's border. */
 export const headerGroupBody = 'flex items-center gap-2 border-r border-line bg-panel pr-1.5 pl-3.5'
 
-/** Select dentro de um grupo do header: sem padding vertical — quem manda na
- *  altura é o grupo — e altura cheia pra área de clique cobrir o controle. */
+/** Select inside a header group: no vertical padding, since the group owns the
+ *  height, and full height so the hit area covers the control. */
 export const headerSelect =
   'h-full cursor-pointer appearance-none bg-transparent pr-7 pl-0 text-sm font-medium text-ink focus:outline-none focus-visible:outline-none'
 
-/** A chave viaja no fragmento: fragmento não chega ao servidor nem a log de acesso. */
+/** The key rides in the fragment: fragments reach neither the server nor its logs. */
 export const linkFor = (key: string) => `${window.location.origin}/#k=${key}`

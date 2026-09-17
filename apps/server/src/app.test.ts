@@ -9,10 +9,10 @@ import * as schema from './db/schema.js'
 import type { Db } from './db/index.js'
 
 let app: ReturnType<typeof buildApp>
-/** Mesmo banco, mas exigindo segredo pra criar project. */
+/** Same database, but demanding a secret to create a project. */
 let appFechado: ReturnType<typeof buildApp>
 
-/** Cria um project e devolve a chave de escrita que nasce com ele. */
+/** Creates a project and returns the write key born with it. */
 async function newProject(name: string) {
   const res = await app.inject({ method: 'POST', url: '/projects', payload: { name } })
   const body = res.json() as { id: string; key: string }
@@ -62,8 +62,8 @@ beforeAll(async () => {
   await appFechado.ready()
 })
 
-describe('chaves de acesso', () => {
-  it('criar project devolve a chave de escrita uma única vez', async () => {
+describe('access keys', () => {
+  it('creating a project returns the write key exactly once', async () => {
     const { id, key } = await newProject('Catcher')
     expect(id).toBeTruthy()
     expect(key.startsWith('somn_')).toBe(true)
@@ -73,7 +73,7 @@ describe('chaves de acesso', () => {
     expect(me.json()).toMatchObject({ scope: 'project', role: 'write' })
   })
 
-  it('recusa chave inexistente, vazia ou com formato errado', async () => {
+  it('refuses an unknown, empty or malformed key', async () => {
     for (const bad of ['somn_naoexiste', 'Bearer', 'abc123', '']) {
       const res = await app.inject({ method: 'GET', url: '/me', headers: auth(bad) })
       expect(res.statusCode).toBe(401)
@@ -82,7 +82,7 @@ describe('chaves de acesso', () => {
     expect(semHeader.statusCode).toBe(401)
   })
 
-  it('emite chave nova com rótulo e papel, e lista as duas', async () => {
+  it('issues a new key with label and role, and lists both', async () => {
     const { key } = await newProject('Piped')
     const nova = await app.inject({
       method: 'POST',
@@ -101,7 +101,7 @@ describe('chaves de acesso', () => {
     expect(keys.filter((k) => k.mine)).toHaveLength(1)
   })
 
-  it('exige rótulo ao emitir chave', async () => {
+  it('demands a label when issuing a key', async () => {
     const { key } = await newProject('Sem rótulo')
     const res = await app.inject({
       method: 'POST',
@@ -112,7 +112,7 @@ describe('chaves de acesso', () => {
     expect(res.statusCode).toBe(400)
   })
 
-  it('chave revogada para de funcionar na hora', async () => {
+  it('a revoked key stops working right away', async () => {
     const { key } = await newProject('Revogar')
     const nova = await app.inject({
       method: 'POST',
@@ -130,12 +130,12 @@ describe('chaves de acesso', () => {
     expect((await app.inject({ method: 'GET', url: '/me', headers: auth(alvo.key) })).statusCode).toBe(401)
   })
 
-  it('chave de um project não alcança outro project', async () => {
+  it('a key of one project does not reach another project', async () => {
     const a = await newProject('A')
     const b = await newProject('B')
     const lista = await app.inject({ method: 'GET', url: '/keys', headers: auth(a.key) })
     const keys = (lista.json() as { keys: unknown[] }).keys
-    expect(keys).toHaveLength(1) // só a dele
+    expect(keys).toHaveLength(1) // only its own
 
     const del = await app.inject({
       method: 'DELETE',
@@ -146,8 +146,8 @@ describe('chaves de acesso', () => {
   })
 })
 
-describe('papel somente-leitura', () => {
-  it('lê o que existe mas não escreve', async () => {
+describe('read-only role', () => {
+  it('reads what exists but does not write', async () => {
     const { key } = await newProject('Leitura')
     const leitura = (
       await app.inject({
@@ -175,12 +175,12 @@ describe('papel somente-leitura', () => {
     })
     expect(push.statusCode).toBe(403)
 
-    // e nada entrou
+    // and nothing got in
     const conferir = await sync(key)
     expect(conferir.json().changes.requests.map((r: { id: string }) => r.id)).toEqual(['r1'])
   })
 
-  it('chave de leitura não emite nem revoga chave', async () => {
+  it('a read key neither issues nor revokes keys', async () => {
     const { key } = await newProject('Leitura 2')
     const leitura = (
       await app.inject({
@@ -201,8 +201,8 @@ describe('papel somente-leitura', () => {
   })
 })
 
-describe('escopo por collection', () => {
-  it('chave de collection lê só a própria collection', async () => {
+describe('per-collection scope', () => {
+  it('a collection key reads only its own collection', async () => {
     const { key } = await newProject('Escopo')
     await sync(key, {
       since: null,
@@ -239,11 +239,11 @@ describe('escopo por collection', () => {
     const body = pull.json()
     expect(body.changes.collections.map((c: { id: string }) => c.id)).toEqual(['colA'])
     expect(body.changes.requests.map((r: { id: string }) => r.id)).toEqual(['rA'])
-    // o environment vem junto: é ele que faz a collection resolver sozinha
+    // the environment comes along: it is what makes the collection resolve on its own
     expect(body.changes.environments.map((e: { id: string }) => e.id)).toEqual(['eA'])
   })
 
-  it('chave de collection não escreve na collection do vizinho', async () => {
+  it('a collection key does not write into the neighbor collection', async () => {
     const { key } = await newProject('Escopo 2')
     await sync(key, {
       since: null,
@@ -282,7 +282,7 @@ describe('escopo por collection', () => {
     expect(ids).not.toContain('nao')
   })
 
-  it('chave de collection não emite chave mais ampla que ela', async () => {
+  it('a collection key does not issue a key broader than itself', async () => {
     const { key } = await newProject('Escopo 3')
     await sync(key, {
       since: null,
@@ -309,7 +309,7 @@ describe('escopo por collection', () => {
 })
 
 describe('sync', () => {
-  it('push de uma chave chega no pull da outra', async () => {
+  it('a push from one key arrives in the pull of another', async () => {
     const { key } = await newProject('Sync 1')
     const colega = (
       await app.inject({
@@ -329,7 +329,7 @@ describe('sync', () => {
     expect(pull.json().changes.requests[0].name).toBe('Login')
   })
 
-  it('last-write-wins: edição mais nova vence, mais velha é ignorada', async () => {
+  it('last-write-wins: the newer edit wins, the older one is ignored', async () => {
     const { key } = await newProject('Sync 2')
     await sync(key, {
       since: null,
@@ -345,7 +345,7 @@ describe('sync', () => {
     expect(pull.json().changes.requests[0].name).toBe('nova')
   })
 
-  it('since filtra: cliente em dia não recebe nada de novo', async () => {
+  it('since filters: a client up to date receives nothing new', async () => {
     const { key } = await newProject('Sync 3')
     const primeiro = await sync(key, {
       since: null,
@@ -358,7 +358,7 @@ describe('sync', () => {
     expect(segundo.json().changes.requests).toHaveLength(0)
   })
 
-  it('deleção vira tombstone e chega na outra ponta', async () => {
+  it('a deletion becomes a tombstone and reaches the other end', async () => {
     const { key } = await newProject('Sync 4')
     const colega = (
       await app.inject({
@@ -383,8 +383,8 @@ describe('sync', () => {
   })
 })
 
-describe('criação de project fechada por token', () => {
-  it('recusa criação sem o segredo', async () => {
+describe('project creation closed by token', () => {
+  it('refuses creation without the secret', async () => {
     const res = await appFechado.inject({
       method: 'POST',
       url: '/projects',
@@ -393,7 +393,7 @@ describe('criação de project fechada por token', () => {
     expect(res.statusCode).toBe(403)
   })
 
-  it('recusa segredo errado', async () => {
+  it('refuses a wrong secret', async () => {
     const res = await appFechado.inject({
       method: 'POST',
       url: '/projects',
@@ -403,7 +403,7 @@ describe('criação de project fechada por token', () => {
     expect(res.statusCode).toBe(403)
   })
 
-  it('aceita com o segredo certo e devolve chave utilizável', async () => {
+  it('accepts the right secret and returns a usable key', async () => {
     const res = await appFechado.inject({
       method: 'POST',
       url: '/projects',
@@ -416,14 +416,14 @@ describe('criação de project fechada por token', () => {
     expect(me.json()).toMatchObject({ project: { name: 'Autorizado' } })
   })
 
-  it('servidor sem token configurado segue criando livremente', async () => {
+  it('a server with no token configured keeps creating freely', async () => {
     const res = await app.inject({ method: 'POST', url: '/projects', payload: { name: 'Livre' } })
     expect(res.statusCode).toBe(200)
   })
 })
 
 describe('proxy', () => {
-  it('bloqueia hosts perigosos e URLs inválidas', async () => {
+  it('blocks dangerous hosts and invalid URLs', async () => {
     const { key } = await newProject('Proxy')
     for (const url of ['http://169.254.169.254/latest', 'http://localhost:4000/x', 'nao-e-url']) {
       const res = await app.inject({
@@ -436,7 +436,7 @@ describe('proxy', () => {
     }
   })
 
-  it('exige chave', async () => {
+  it('demands a key', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/proxy',

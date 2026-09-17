@@ -66,7 +66,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 onClick={() => close(false)}
                 className="rounded-md px-3 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
               >
-                {pending.cancelLabel ?? 'Cancelar'}
+                {pending.cancelLabel ?? 'Cancel'}
               </button>
               <button
                 ref={confirmRef}
@@ -75,7 +75,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   pending.danger ? 'bg-bad hover:bg-bad/85' : 'bg-brand hover:bg-brand-hi'
                 }`}
               >
-                {pending.confirmLabel ?? 'Confirmar'}
+                {pending.confirmLabel ?? 'Confirm'}
               </button>
             </div>
           </div>

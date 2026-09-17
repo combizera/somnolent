@@ -5,18 +5,18 @@ export type ImportFormat = "insomnia-v4" | "insomnia-v5";
 
 export interface ImportResult extends ImportPayload {
   format: ImportFormat;
-  /** Nome da collection, quando o arquivo traz um. */
+  /** Collection name, when the file carries one. */
   sourceName?: string;
 }
 
-/** Aceita JSON e YAML — o parser de YAML só é baixado quando faz falta. */
+/** Accepts JSON and YAML — the YAML parser is only downloaded when needed. */
 async function parseDocument(text: string): Promise<unknown> {
   const trimmed = text.trim();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     try {
       return JSON.parse(trimmed);
     } catch {
-      // Não era JSON válido; tenta como YAML abaixo.
+      // Not valid JSON; fall through to YAML below.
     }
   }
   const { parse } = await import("yaml");
@@ -24,14 +24,14 @@ async function parseDocument(text: string): Promise<unknown> {
     return parse(trimmed);
   } catch (err) {
     throw new Error(
-      `Não consegui ler o arquivo como JSON nem como YAML. ${err instanceof Error ? err.message : ""}`.trim(),
+      `Could not read the file as JSON or as YAML. ${err instanceof Error ? err.message : ""}`.trim(),
     );
   }
 }
 
 /**
- * Importa um export do Insomnia sem precisar dizer a versão: v5 vem em YAML com
- * `type: collection.insomnia.rest`, v4 vem em JSON com `resources`.
+ * Imports an Insomnia export without being told the version: v5 comes as YAML
+ * with `type: collection.insomnia.rest`, v4 as JSON with `resources`.
  */
 export async function importInsomniaExport(
   text: string,
@@ -51,6 +51,6 @@ export async function importInsomniaExport(
   }
 
   throw new Error(
-    "Formato não reconhecido. Esperava um export do Insomnia: v5 (YAML, começa com 'type: collection.insomnia.rest/5.0') ou v4 (JSON, com o campo 'resources').",
+    "Unrecognized format. Expected an Insomnia export: v5 (YAML, starting with 'type: collection.insomnia.rest/5.0') or v4 (JSON, with the 'resources' field).",
   );
 }

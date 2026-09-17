@@ -1,16 +1,16 @@
 import type { Environment, EnvironmentVariable } from "./types.js";
 
 /**
- * Nome de environment é rótulo humano: "staging" e " Staging " são o mesmo
- * ambiente pra quem lê, então a comparação ignora caixa e espaços nas pontas.
+ * An environment name is a human label: "staging" and " Staging " read as the
+ * same one, so the comparison ignores case and surrounding spaces.
  */
 export function normalizeEnvName(name: string): string {
   return name.trim().toLocaleLowerCase();
 }
 
 /**
- * Ids dos environments cujo nome colide com o de outro.
- * Environments sem nome não contam — o usuário ainda está digitando.
+ * Ids of environments whose name collides with another's.
+ * Unnamed ones do not count — the user is still typing.
  */
 export function duplicateEnvIds(environments: Environment[]): Set<string> {
   const byName = new Map<string, string[]>();
@@ -29,10 +29,8 @@ export function duplicateEnvIds(environments: Environment[]): Set<string> {
 }
 
 /**
- * Índices das variáveis cuja chave colide dentro do mesmo environment.
- * A comparação é exata (case-sensitive) porque a resolução de {{var}} também
- * é — `token` e `Token` são variáveis distintas, não duplicata.
- * Chaves vazias são ignoradas: é a linha recém-criada, ainda em branco.
+ * Indexes of variables whose key collides inside the same environment.
+ * Case-sensitive because {{var}} resolution is too; blank keys are ignored.
  */
 export function duplicateVarIndexes(variables: EnvironmentVariable[]): Set<number> {
   const byKey = new Map<string, number[]>();
@@ -50,8 +48,8 @@ export function duplicateVarIndexes(variables: EnvironmentVariable[]): Set<numbe
 }
 
 /**
- * Nome livre a partir de `desired`, sufixando " 2", " 3"... enquanto colidir.
- * Usado onde o nome nasce sem o usuário digitar (botão "+ environment", import).
+ * Free name from `desired`, suffixing " 2", " 3"... while it collides.
+ * Used where the name is born without typing ("+ environment" button, import).
  */
 export function uniqueEnvName(desired: string, taken: string[]): string {
   const used = new Set(taken.map(normalizeEnvName));

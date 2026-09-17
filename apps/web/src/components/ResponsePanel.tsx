@@ -19,7 +19,7 @@ const NO_HISTORY: HistoryEntry[] = []
 
 const WRAP = EditorView.lineWrapping
 
-/** Faixa de status → cor semântica (independente da marca e do environment). */
+/** Status band → semantic color (independent of brand and environment). */
 function statusChip(status: number) {
   if (status < 300) return 'bg-ok/20 text-ok'
   if (status < 400) return 'bg-info/20 text-info'
@@ -34,7 +34,7 @@ function statusText(status: number) {
   return 'text-bad'
 }
 
-/** `data` viaja junto pro filtro não refazer o parse a cada tecla. */
+/** `data` travels along so the filter does not re-parse on every keystroke. */
 function prettyBody(body: string): { text: string; isJson: boolean; data: unknown } {
   try {
     const data: unknown = JSON.parse(body)
@@ -62,8 +62,8 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
   const [tab, setTab] = useState<Tab>('body')
   const [viewingId, setViewingId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  // O painel remonta por request (`key` em quem usa), então o filtro já
-  // começa vazio ao trocar de aba.
+  // The panel remounts per request (`key` at the caller), so the filter already
+  // starts empty when switching tabs.
   const [filter, setFilter] = useState('')
   const editor = useRef<ReactCodeMirrorRef>(null)
 
@@ -72,8 +72,8 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
 
   const view: View | null = viewingEntry ? viewingEntry : response?.ok ? response : null
 
-  // O memo é o que dá ao `data` identidade estável — sem ela o memo do filtro
-  // abaixo nunca acertaria. `view` vem de store, então só muda de verdade.
+  // The memo is what gives `data` a stable identity; without it the filter memo
+  // below would never hit.
   const pretty = useMemo(() => (view ? prettyBody(view.body) : null), [view])
 
   const filtered = useMemo(
@@ -86,14 +86,14 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
 
   const copy = async () => {
     if (!pretty) return
-    // Com filtro na barra, o recorte é o que interessa.
+    // With a filter in the bar, the slice is what matters.
     await copyText(filtered.text)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
 
-  // Dobrar item a item não serve numa lista de mil: o botão age no documento
-  // inteiro, e a seta de cada linha continua lá pra abrir o que interessa.
+  // Folding one by one is useless in a list of a thousand: the button acts on
+  // the whole document, and each row's arrow still opens what matters.
   const fold = (all: boolean) => {
     const view = editor.current?.view
     if (view) (all ? foldAll : unfoldAll)(view)
@@ -102,14 +102,14 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'body', label: 'Body' },
     { id: 'headers', label: 'Headers', count: view?.headers.length },
-    { id: 'history', label: 'Histórico', count: history.length },
+    { id: 'history', label: 'History', count: history.length },
   ]
 
   return (
     <section className="flex h-full min-w-0 flex-col border-l border-line bg-panel">
-      {/* barra de status */}
+      {/* status bar */}
       <header className="flex h-9 shrink-0 items-center gap-2 border-b border-line px-3 text-sm">
-        {sending && <span className="animate-pulse text-ink-dim">Enviando…</span>}
+        {sending && <span className="animate-pulse text-ink-dim">Sending…</span>}
         {!sending && view && (
           <>
             <span
@@ -127,9 +127,9 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
               <button
                 onClick={() => setViewingId(null)}
                 className="ml-auto flex items-center gap-1 rounded bg-raised px-2 py-0.5 text-xs text-ink-dim transition hover:text-ink"
-                title="Voltar para a response mais recente"
+                title="Back to the latest response"
               >
-                Vendo histórico
+                Viewing history
                 <X className="size-3" />
               </button>
             )}
@@ -137,11 +137,11 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
         )}
         {!sending && !view && response && !response.ok && (
           <span className="rounded bg-bad/20 px-2 py-0.5 font-mono text-xs font-bold text-bad">
-            Falhou
+            Failed
           </span>
         )}
         {!sending && !view && (!response || response.ok) && (
-          <span className="text-ink-faint">Sem response ainda</span>
+          <span className="text-ink-faint">No response yet</span>
         )}
       </header>
 
@@ -178,16 +178,16 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
                 <button
                   onClick={() => fold(true)}
                   className="flex items-center rounded p-1 text-ink-faint transition hover:bg-raised hover:text-ink"
-                  title="Colapsar tudo"
-                  aria-label="Colapsar tudo"
+                  title="Collapse all"
+                  aria-label="Collapse all"
                 >
                   <ChevronsDownUp aria-hidden className="size-3.5" />
                 </button>
                 <button
                   onClick={() => fold(false)}
                   className="flex items-center rounded p-1 text-ink-faint transition hover:bg-raised hover:text-ink"
-                  title="Expandir tudo"
-                  aria-label="Expandir tudo"
+                  title="Expand all"
+                  aria-label="Expand all"
                 >
                   <ChevronsUpDown aria-hidden className="size-3.5" />
                 </button>
@@ -200,17 +200,17 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
                 className={`my-1 flex shrink-0 items-center gap-1 self-center rounded px-2 py-1 text-xs text-ink-faint transition hover:bg-raised hover:text-ink ${
                   pretty.isJson && tab === 'body' ? '' : 'ml-auto'
                 }`}
-                title="Copiar o que está na tela"
+                title="Copy what is on screen"
               >
                 {copied ? (
                   <>
                     <Check className="size-3" />
-                    Copiado
+                    Copied
                   </>
                 ) : (
                   <>
                     <Copy className="size-3" />
-                    Copiar
+                    Copy
                   </>
                 )}
               </button>
@@ -220,14 +220,14 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
           {tab === 'body' &&
             (pretty ? (
               <div className="flex min-h-0 flex-1 flex-col">
-                {/* overflow-hidden, e não auto: quem rola é o .cm-scroller do
-                    CodeMirror. Dois containers de scroll aninhados se anulam. */}
+                {/* overflow-hidden, not auto: the .cm-scroller is what scrolls.
+                    Two nested scroll containers cancel each other out. */}
                 <div className="min-h-0 flex-1 overflow-hidden">
                   <CodeMirror
                     value={filtered.text}
                     readOnly
-                    // Quebra a linha em vez de abrir scroll lateral: resposta
-                    // com uma linha gigante é a regra, não a exceção.
+                    // Wrap instead of opening a horizontal scroll: a response on
+                    // one giant line is the rule, not the exception.
                     extensions={
                       pretty.isJson ? [json(), jsonFold, WRAP, codeTheme] : [WRAP, codeTheme]
                     }
@@ -248,8 +248,8 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
               </div>
             ) : (
               <p className="p-4 text-sm text-ink-faint">
-                Aperte <span className="font-semibold text-ink-dim">Enviar</span> para ver a
-                response aqui.
+                Hit <span className="font-semibold text-ink-dim">Send</span> to see the
+                response here.
               </p>
             ))}
 
@@ -269,7 +269,7 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
                     </tbody>
                   </table>
                 ) : (
-                  <p className="text-sm text-ink-faint">Sem headers para mostrar.</p>
+                  <p className="text-sm text-ink-faint">No headers to show.</p>
                 )}
               </div>
             )}
@@ -278,7 +278,7 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
                 {history.length === 0 ? (
                   <p className="text-sm text-ink-faint">
-                    Cada envio desta request fica registrado aqui.
+                    Every send of this request is recorded here.
                   </p>
                 ) : (
                   <>
@@ -314,7 +314,7 @@ export function ResponsePanel({ requestId }: { requestId: string }) {
                       }}
                       className="mt-3 rounded px-2 py-1 text-sm text-ink-faint transition hover:bg-raised hover:text-ink"
                     >
-                      limpar histórico
+                      Clear history
                     </button>
                   </>
                 )}

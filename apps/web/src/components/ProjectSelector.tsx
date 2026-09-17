@@ -4,11 +4,8 @@ import { bySortOrder, useStore } from '../store'
 import { useConfirm } from '../lib/confirm'
 import { headerGroup, headerGroupBody, headerSelect } from '../lib/ui'
 
-/**
- * Seletor de project no header. Project é o nível acima da collection e a
- * unidade que se compartilha inteira; trocar aqui troca a lista da sidebar.
- * Não virou um terceiro nível na sidebar de propósito — ela já tem dois.
- */
+/** A project is the level above the collection and the unit that gets shared
+ *  whole; it is not a third sidebar level on purpose — it already has two. */
 export function ProjectSelector() {
   const projects = useStore((s) => s.projects)
   const openProjectId = useStore((s) => s.openProjectId)
@@ -45,7 +42,7 @@ export function ProjectSelector() {
               onChange={(e) => openProject(e.target.value)}
               onDoubleClick={() => setEditing(true)}
               className={headerSelect}
-              title="Project aberto — duplo clique para renomear"
+              title="Open project — double click to rename"
             >
               {sorted.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -61,10 +58,10 @@ export function ProjectSelector() {
         )}
       </div>
       <button
-        onClick={() => openProject(addProject('Novo project'))}
+        onClick={() => openProject(addProject('New project'))}
         className="bg-panel px-2 text-ink-dim transition hover:bg-raised hover:text-ink"
-        title="Novo project"
-        aria-label="Novo project"
+        title="New project"
+        aria-label="New project"
       >
         <Plus className="size-3.5" />
       </button>
@@ -72,17 +69,17 @@ export function ProjectSelector() {
         <button
           onClick={async () => {
             const ok = await confirm({
-              title: `Excluir o project "${open.name}"?`,
+              title: `Delete the project "${open.name}"?`,
               message:
-                'Todas as collections dele, com requests e environments, são apagadas desta máquina.',
-              confirmLabel: 'Excluir project',
+                'Every collection of it, with requests and environments, is erased from this machine.',
+              confirmLabel: 'Delete project',
               danger: true,
             })
             if (ok) deleteProject(open.id)
           }}
           className="border-l border-line bg-panel px-2 text-ink-faint transition hover:bg-bad/10 hover:text-bad"
-          title="Excluir project"
-          aria-label="Excluir project"
+          title="Delete project"
+          aria-label="Delete project"
         >
           <Trash2 className="size-3.5" />
         </button>

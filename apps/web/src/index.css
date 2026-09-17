@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* superfícies — cinzas com viés roxo, não neutros */
+  /* surfaces — greys with a purple bias, not neutrals */
   --color-app: #16161b;
   --color-panel: #1c1c23;
   --color-raised: #23232c;
@@ -9,17 +9,17 @@
   --color-line: #2e2e3a;
   --color-line-soft: #262630;
 
-  /* texto */
+  /* text */
   --color-ink: #e6e6ee;
   --color-ink-dim: #9a9aad;
   --color-ink-faint: #6a6a7c;
 
-  /* marca — o roxo conduz todos os controles */
+  /* brand — the purple drives every control */
   --color-brand: #7c5cff;
   --color-brand-hi: #9179ff;
   --color-brand-soft: #262046;
 
-  /* métodos HTTP */
+  /* HTTP methods */
   --color-get: #74c264;
   --color-post: #a78bfa;
   --color-put: #efa14e;
@@ -27,14 +27,14 @@
   --color-delete: #ef6b76;
   --color-plain: #8b8b9c;
 
-  /* sintaxe do JSON nos editores — chave e valor em cores distintas */
+  /* JSON syntax in the editors — key and value in distinct colors */
   --color-syn-key: #8ab4f8;
   --color-syn-string: #85cf74;
   --color-syn-number: #efa14e;
   --color-syn-atom: #c792ea;
   --color-syn-punct: #6a6a7c;
 
-  /* estado semântico — separado da marca */
+  /* semantic state — kept apart from the brand */
   --color-ok: #58ad4c;
   --color-info: #4f97e8;
   --color-warn: #d9a021;
@@ -53,7 +53,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* barras de rolagem finas, no tom do painel */
+/* thin scrollbars, in the panel's tone */
 ::-webkit-scrollbar {
   width: 11px;
   height: 11px;
@@ -79,7 +79,7 @@ body {
   background: transparent;
 }
 
-/* CodeMirror herda as superfícies do app */
+/* CodeMirror inherits the app surfaces */
 .cm-editor {
   background: transparent !important;
   height: 100%;
@@ -101,8 +101,8 @@ body {
   color: var(--color-ink-faint) !important;
 }
 
-/* As setas de fold vêm como glifo minúsculo na cor do gutter — dá pra clicar,
-   mas ninguém acha. Área maior e contraste no hover. */
+/* Fold arrows ship as a tiny glyph in the gutter color: clickable, but nobody
+   finds them. Bigger area and contrast on hover. */
 .cm-foldGutter .cm-gutterElement {
   padding: 0 3px;
   cursor: pointer;
@@ -114,15 +114,21 @@ body {
   color: var(--color-brand-hi);
 }
 
-/* O marcador do trecho dobrado é um `…` sem contorno; dar corpo a ele é o que
-   mostra que há conteúdo escondido ali. */
+/* The folded marker is an outline-less `…`; giving it a body is what shows
+   there is content hidden in there. */
 .cm-foldPlaceholder {
   background: var(--color-raised) !important;
   border: 1px solid var(--color-line) !important;
   border-radius: 4px;
-  color: var(--color-ink-dim) !important;
+  color: var(--color-ink-faint) !important;
   padding: 0 6px;
   margin: 0 2px;
+}
+
+/* Hidden item count: the arrows are framing, the number carries the meaning. */
+.cm-foldCount {
+  color: var(--color-brand-hi);
+  font-weight: 600;
 }
 
 .cm-activeLine,
@@ -130,11 +136,69 @@ body {
   background: rgba(124, 92, 255, 0.06) !important;
 }
 
-/* Foco visível e consistente em toda a UI.
-   Dentro de @layer base de propósito: regra sem layer vence utility em layer
-   independente de especificidade, e fora daqui nenhum `focus-visible:outline-none`
-   conseguiria desligar este anel — era o que desenhava uma borda solta em volta
-   do texto dos <select> dentro dos grupos com borda. */
+/* `{{ var }}` in the body, same language as the URL field.
+   Outline is inset box-shadow, not border/padding: width here would misplace
+   the caret inside the token. */
+.cm-var {
+  background: rgba(124, 92, 255, 0.2);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(124, 92, 255, 0.45);
+}
+
+.cm-var-missing {
+  background: rgba(224, 82, 95, 0.18);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(224, 82, 95, 0.45);
+  text-decoration: underline wavy rgba(224, 82, 95, 0.6);
+}
+
+/* JSON syntax highlighting nests a span INSIDE this one, and the child's own
+   color beats the inherited one — hence the second selector. */
+.cm-var,
+.cm-var span {
+  color: var(--color-brand-hi);
+}
+
+.cm-var-missing,
+.cm-var-missing span {
+  color: var(--color-bad);
+}
+
+/* Editor variable list — CodeMirror's default is white; match the URL field's. */
+.cm-tooltip.cm-tooltip-autocomplete {
+  border: 1px solid var(--color-line) !important;
+  border-radius: 6px;
+  background: var(--color-panel) !important;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+  overflow: hidden;
+}
+
+.cm-tooltip-autocomplete > ul > li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 10px !important;
+  color: var(--color-ink-dim);
+}
+
+.cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: var(--color-hover) !important;
+  color: var(--color-ink) !important;
+}
+
+/* Resolved value on the right: it answers "is this the right variable?" */
+.cm-tooltip-autocomplete .cm-completionDetail {
+  margin-left: auto;
+  overflow: hidden;
+  max-width: 180px;
+  color: var(--color-ink-faint);
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Visible, consistent focus across the UI. Inside @layer base on purpose: an
+   unlayered rule beats a layered utility, so nothing could turn this ring off. */
 @layer base {
   :focus-visible {
     outline: 2px solid var(--color-brand);
@@ -142,7 +206,7 @@ body {
   }
 }
 
-/* o Tailwind v4 não dá cursor: pointer pra botão — tudo que clica, clica */
+/* Tailwind v4 gives no cursor: pointer to buttons — whatever clicks, clicks */
 button,
 select,
 summary,
@@ -163,8 +227,8 @@ input:disabled,
   cursor: not-allowed;
 }
 
-/* redimensionando painel: o cursor não muda ao passar por cima do conteúdo,
-   e nada é selecionado por engano durante o arraste */
+/* resizing a panel: the cursor stays put over the content, and nothing gets
+   selected by accident mid-drag */
 body.is-resizing {
   cursor: col-resize !important;
   user-select: none !important;
@@ -175,7 +239,7 @@ body.is-resizing .cm-editor {
   pointer-events: none;
 }
 
-/* arraste: o item some parcialmente e o ponteiro vira "agarrando" */
+/* dragging: the item partly fades and the pointer becomes "grabbing" */
 body.is-dragging,
 body.is-dragging * {
   cursor: grabbing !important;

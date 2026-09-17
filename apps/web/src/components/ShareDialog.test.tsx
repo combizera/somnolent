@@ -3,8 +3,8 @@ import { render, screen } from '@testing-library/react'
 import { ShareDialog } from './ShareDialog'
 import { useSession } from '../sessionStore'
 
-describe('ShareDialog: controles no mesmo tamanho', () => {
-  it('input e selects compartilham altura, largura e fundo', () => {
+describe('ShareDialog: controls at the same size', () => {
+  it('input and selects share height, width and background', () => {
     useSession.getState().openShare()
     render(<ShareDialog />)
 
@@ -16,15 +16,15 @@ describe('ShareDialog: controles no mesmo tamanho', () => {
     for (const el of [input, ...selects]) {
       for (const c of base) expect(el.className).toContain(c)
     }
-    // sem isto o navegador desenha o controle nativo, quase preto
+    // without this the browser draws the native control, nearly black
     for (const sel of selects) expect(sel.className).toContain('appearance-none')
   })
 
-  it('os dois selects dividem a linha em colunas iguais', () => {
+  it('the two selects split the row into equal columns', () => {
     useSession.getState().openShare()
     render(<ShareDialog />)
     const [role] = screen.getAllByRole('combobox')
-    // Field > span.relative > select  →  a coluna do grid é o Field
+    // Field > span.relative > select  →  the grid column is the Field
     const column = role!.closest('label')!
     expect(column.parentElement!.className).toContain('grid-cols-2')
   })

@@ -2,7 +2,7 @@ import type { ApiRequest, Environment, KeyValue } from "./types.js";
 
 const VAR_PATTERN = /\{\{\s*([\w.-]+)\s*\}\}/g;
 
-/** Base64 que funciona no navegador e no Node. */
+/** Base64 that works in the browser and in Node. */
 function toBase64(text: string): string {
   if (typeof btoa === "function") return btoa(text);
   const BufferCtor = (globalThis as Record<string, any>)["Buffer"];
@@ -11,14 +11,13 @@ function toBase64(text: string): string {
 
 export interface ResolveResult {
   output: string;
-  /** Variáveis referenciadas no template que não existem no contexto. */
+  /** Variables referenced by the template that do not exist in the context. */
   missing: string[];
 }
 
 /**
- * Monta o dicionário de valores: base environment primeiro,
- * ambiente ativo por cima (sobrescreve chaves repetidas).
- * Variáveis desabilitadas são ignoradas.
+ * Builds the value map: base environment first, active one on top (it wins on
+ * repeated keys). Disabled variables are ignored.
  */
 export function buildContext(
   base: Environment | null,
@@ -34,7 +33,7 @@ export function buildContext(
   return ctx;
 }
 
-/** Substitui {{ var }} pelos valores do contexto. Sem lógica, só substituição. */
+/** Replaces {{ var }} with the context values. No logic, just substitution. */
 export function resolveTemplate(
   template: string,
   ctx: Record<string, string>,
@@ -51,7 +50,7 @@ export function resolveTemplate(
   return { output, missing };
 }
 
-/** Lista os nomes de variáveis referenciados num template. */
+/** Lists the variable names referenced in a template. */
 export function extractVariables(template: string): string[] {
   const names: string[] = [];
   for (const match of template.matchAll(VAR_PATTERN)) {
@@ -62,19 +61,19 @@ export function extractVariables(template: string): string[] {
 }
 
 /**
- * `:param` na URL, estilo Insomnia. Exige letra ou `_` no começo pra não
- * confundir com `https://` nem com porta (`:8080`).
+ * `:param` in the URL, Insomnia style. Requires a letter or `_` up front so it
+ * is not confused with `https://` or with a port (`:8080`).
  */
 const PATH_PARAM = /:([A-Za-z_][\w-]*)/g;
 
-/** Parte antes do `?` e a query. Depois do `?`, `:` é caractere comum — quem
- *  escreve `?:status=all` quer um query param, não um path param. */
+/** The part before `?` and the query. After the `?`, `:` is an ordinary
+ *  character — `?:status=all` means a query param, not a path param. */
 function splitAtQuery(url: string): [string, string] {
   const at = url.indexOf("?");
   return at === -1 ? [url, ""] : [url.slice(0, at), url.slice(at)];
 }
 
-/** Nomes dos path params citados na URL, na ordem, sem repetir. */
+/** Path param names cited in the URL, in order, without repeats. */
 export function extractPathParams(url: string): string[] {
   const names: string[] = [];
   for (const match of splitAtQuery(url)[0].matchAll(PATH_PARAM)) {
@@ -84,10 +83,8 @@ export function extractPathParams(url: string): string[] {
   return names;
 }
 
-/** Separa a query string da URL em pares editáveis.
- *
- *  Os valores saem decodificados porque é assim que voltam pra URL no envio —
- *  guardar `a%20b` cru viraria `a%2520b` na segunda passada. */
+/** Splits the URL query string into editable pairs. Values come out decoded,
+ *  since storing `a%20b` raw would turn into `a%2520b` on the next pass. */
 export function splitQueryParams(url: string): {
   url: string;
   params: { key: string; value: string }[];
@@ -98,13 +95,13 @@ export function splitQueryParams(url: string): {
   for (const [key, value] of new URLSearchParams(query.slice(1))) {
     params.push({ key, value });
   }
-  // Sem par nenhum (`?` sozinho, ou `?#frag`), a query não some da URL.
+  // With no pair at all (`?` alone, or `?#frag`), the query stays in the URL.
   return params.length > 0 ? { url: base, params } : { url, params: [] };
 }
 
 /**
- * Troca cada `:param` pelo valor preenchido. Param sem valor fica visível na
- * URL e é reportado como faltando — mesmo tratamento de `{{var}}` indefinida.
+ * Replaces each `:param` with its filled value. An empty one stays visible in
+ * the URL and is reported as missing, like an undefined `{{var}}`.
  */
 export function applyPathParams(
   url: string,
@@ -147,8 +144,8 @@ function resolvePairs(
 }
 
 /**
- * Resolve a request inteira contra o environment ativo:
- * URL, query params, headers e body, tudo com {{vars}} substituídas.
+ * Resolves the whole request against the active environment: URL, query params,
+ * headers and body, all with {{vars}} substituted.
  */
 export function resolveRequest(
   request: ApiRequest,
@@ -161,13 +158,13 @@ export function resolveRequest(
   const url = resolveTemplate(request.url, ctx);
   for (const m of url.missing) missing.add(m);
 
-  // `:param` é resolvido depois do template: o valor de um {{var}} pode conter
-  // o `:param`, mas nunca o contrário.
+  // `:param` resolves after the template: a {{var}} value may contain a
+  // `:param`, but never the other way around.
   const pathValues = Object.fromEntries(
     resolvePairs(request.pathParams ?? [], ctx, missing).map(({ key, value }) => [key, value]),
   );
-  // Path param vazio NÃO entra em `missing`: a linha dele já fica vermelha na
-  // aba Params, e a request continua enviável — quem responde é a API.
+  // An empty path param stays out of `missing`: its row already turns red in
+  // the Params tab, and the request is still sendable — the API answers.
   const withPath = applyPathParams(url.output, pathValues);
 
   const query = resolvePairs(request.queryParams, ctx, missing);
@@ -181,7 +178,7 @@ export function resolveRequest(
 
   const headers = resolvePairs(request.headers, ctx, missing);
 
-  // Auth helper: gera Authorization, a não ser que exista um header manual.
+  // Auth helper: builds Authorization unless a manual header is already there.
   const hasAuthHeader = headers.some((h) => h.key.toLowerCase() === "authorization");
   const auth = request.auth;
   if (auth && auth.type !== "none" && !hasAuthHeader) {
@@ -201,7 +198,13 @@ export function resolveRequest(
   }
 
   let body: string | null = null;
-  if (request.bodyType !== "none" && request.body !== null) {
+  if (request.bodyType === "form") {
+    // Enabled rows only, like query params and headers.
+    const pairs = resolvePairs(request.formBody ?? [], ctx, missing);
+    body = new URLSearchParams(
+      pairs.map(({ key, value }) => [key, value]),
+    ).toString();
+  } else if (request.bodyType !== "none" && request.body !== null) {
     const resolved = resolveTemplate(request.body, ctx);
     for (const m of resolved.missing) missing.add(m);
     body = resolved.output;
@@ -216,19 +219,19 @@ export function resolveRequest(
   };
 }
 
-/** Um `{{` aberto e ainda não fechado à esquerda do caret. */
+/** A `{{` opened and not yet closed to the left of the caret. */
 export interface OpenToken {
-  /** Posição do `{{`. */
+  /** Position of the `{{`. */
   start: number;
-  /** Nome parcial já digitado depois dele, sem espaços nas pontas. */
+  /** Partial name already typed after it, trimmed. */
   query: string;
 }
 
 const OPEN_TOKEN = /\{\{([\w.\- ]*)$/;
 
 /**
- * Detecta se o caret está dentro de um `{{ ... }}` em aberto — é o que
- * dispara o autocomplete de variáveis. Devolve null quando não está.
+ * Detects whether the caret sits inside an open `{{ ... }}` — that is what
+ * triggers variable autocomplete. Null when it does not.
  */
 export function findOpenToken(text: string, caret: number): OpenToken | null {
   const before = text.slice(0, Math.max(0, Math.min(caret, text.length)));
@@ -238,9 +241,8 @@ export function findOpenToken(text: string, caret: number): OpenToken | null {
 }
 
 /**
- * Troca o token em aberto pela variável escolhida, devolvendo o texto novo e
- * onde o caret deve ficar. Come um `}}` que já esteja à frente do caret, pra
- * não duplicar as chaves.
+ * Swaps the open token for the chosen variable, returning the new text and the
+ * caret. Eats a `}}` already ahead of the caret so braces are not doubled.
  */
 export function completeToken(
   text: string,
@@ -258,9 +260,9 @@ export function completeToken(
 }
 
 /**
- * Ordena as variáveis pro autocomplete: quem começa com o que foi digitado vem
- * primeiro, depois quem só contém; alfabético dentro de cada grupo. Devolve a
- * lista inteira de propósito — cortar em N esconde variável sem avisar.
+ * Ranks variables for autocomplete: prefix matches first, then substring ones,
+ * alphabetical within each group. The whole list comes back on purpose —
+ * cutting at N hides variables silently.
  */
 export function rankVariables(names: string[], query: string): string[] {
   const q = query.toLowerCase();

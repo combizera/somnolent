@@ -4,7 +4,7 @@ import type { ResolvedRequest } from "./template.js";
 
 export interface ParsedCurl {
   method: HttpMethod;
-  /** Sem a query string — ela vem separada em `queryParams`. */
+  /** Without the query string — it comes apart in `queryParams`. */
   url: string;
   queryParams: { key: string; value: string }[];
   headers: { key: string; value: string }[];
@@ -14,7 +14,7 @@ export interface ParsedCurl {
 
 const METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
 
-/** Tokeniza uma linha de comando respeitando aspas simples/duplas e \ de quebra de linha. */
+/** Tokenizes a command line, honoring single/double quotes and \ line breaks. */
 function tokenize(command: string): string[] {
   const tokens: string[] = [];
   let current = "";
@@ -51,11 +51,11 @@ function tokenize(command: string): string[] {
   return tokens;
 }
 
-/** Importa um comando `curl ...` pra uma request. Suporta -X, -H, -d/--data*, -u, --url.
- *  A query string da URL vira linhas de query param — é lá que dá pra editar. */
+/** Imports a `curl ...` command into a request. Supports -X, -H, -d/--data*, -u, --url.
+ *  The URL query string becomes query param rows — that is where it can be edited. */
 export function parseCurl(command: string): ParsedCurl {
   const tokens = tokenize(command.trim());
-  if (tokens[0] !== "curl") throw new Error("O comando precisa começar com 'curl'.");
+  if (tokens[0] !== "curl") throw new Error("The command must start with 'curl'.");
 
   let method: string | null = null;
   let url = "";
@@ -112,14 +112,14 @@ export function parseCurl(command: string): ParsedCurl {
       case "--cookie":
       case "--connect-timeout":
       case "--max-time":
-        i++; // flags com argumento que a gente ignora
+        i++; // flags with an argument we ignore
         break;
       default:
         if (!t.startsWith("-") && !url) url = t;
     }
   }
 
-  if (!url) throw new Error("Não achei a URL no comando curl.");
+  if (!url) throw new Error("No URL found in the curl command.");
   if (basicUser !== null) {
     const b64 =
       typeof btoa === "function"
@@ -151,7 +151,7 @@ function shellQuote(text: string): string {
   return `'${text.replace(/'/g, `'\\''`)}'`;
 }
 
-/** Gera um comando curl a partir de uma request já resolvida (vars substituídas). */
+/** Builds a curl command from an already resolved request (vars substituted). */
 export function toCurl(resolved: ResolvedRequest): string {
   const parts = [`curl -X ${resolved.method} ${shellQuote(resolved.url)}`];
   for (const h of resolved.headers) {
@@ -163,7 +163,7 @@ export function toCurl(resolved: ResolvedRequest): string {
   return parts.join(" \\\n  ");
 }
 
-/** Converte os headers do parseCurl pro formato KeyValue do app. */
+/** Converts the parseCurl headers into the app's KeyValue shape. */
 export function curlHeadersToKeyValues(
   parsed: ParsedCurl,
   makeId: () => string,
@@ -171,7 +171,7 @@ export function curlHeadersToKeyValues(
   return parsed.headers.map((h) => ({ id: makeId(), key: h.key, value: h.value, enabled: true }));
 }
 
-/** Idem pros query params que vieram da URL. */
+/** Same for the query params that came from the URL. */
 export function curlQueryToKeyValues(
   parsed: ParsedCurl,
   makeId: () => string,

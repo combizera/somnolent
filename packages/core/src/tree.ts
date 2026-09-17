@@ -1,11 +1,8 @@
 import type { Collection } from "./types.js";
 
 /**
- * Sobe a cadeia de `parentId` até a collection raiz (a que tem `parentId: null`).
- * É ela que dá nome à collection na sidebar, que é dona dos environments e que
- * define o escopo de uma chave de compartilhamento.
- *
- * Devolve null se o id não existe ou se a cadeia estiver quebrada.
+ * Walks up `parentId` to the root collection: it names the entry in the sidebar,
+ * owns the environments and scopes a share key. Null if the chain is broken.
  */
 export function rootCollectionOf(
   collections: Collection[],
@@ -14,7 +11,7 @@ export function rootCollectionOf(
   if (!collectionId) return null;
   const byId = new Map(collections.map((c) => [c.id, c]));
   let current = byId.get(collectionId);
-  // guarda contra ciclo: no pior caso visita cada collection uma vez
+  // cycle guard: at worst it visits each collection once
   for (let hops = 0; current && hops <= collections.length; hops++) {
     if (current.parentId === null) return current;
     current = byId.get(current.parentId);
@@ -22,7 +19,7 @@ export function rootCollectionOf(
   return null;
 }
 
-/** Ids da collection e de tudo que pende dela. */
+/** Ids of the collection and of everything hanging from it. */
 export function subtreeIds(collections: Collection[], rootId: string): Set<string> {
   const ids = new Set<string>([rootId]);
   let grew = true;
@@ -39,9 +36,8 @@ export function subtreeIds(collections: Collection[], rootId: string): Set<strin
 }
 
 /**
- * Ids das collections de um project — raízes e pastas.
- * Environment não guarda `projectId`: ele pende de uma collection raiz, então
- * é por este conjunto que se decide se um environment é deste project.
+ * Ids of a project's collections — roots and folders. An environment has no
+ * `projectId`, so this set decides whether one belongs to the project.
  */
 export function collectionIdsOfProject(
   collections: Collection[],

@@ -2,11 +2,11 @@ import { createContext, useContext } from 'react'
 
 export interface ConfirmOptions {
   title: string
-  /** Uma linha explicando a consequência — o que se perde, e se dá pra voltar. */
+  /** One line on the consequence — what is lost, and whether it can be undone. */
   message?: string
   confirmLabel?: string
   cancelLabel?: string
-  /** Ação destrutiva: botão vermelho. */
+  /** Destructive action: red button. */
   danger?: boolean
 }
 
@@ -14,7 +14,7 @@ export type Ask = (options: ConfirmOptions) => Promise<boolean>
 
 export const ConfirmContext = createContext<Ask>(async () => false)
 
-/** Substitui o `confirm()` do navegador por um diálogo com a UI do app. */
+/** Replaces the browser `confirm()` with a dialog in the app's own UI. */
 export function useConfirm(): Ask {
   return useContext(ConfirmContext)
 }

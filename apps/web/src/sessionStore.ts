@@ -1,15 +1,12 @@
 import { create } from 'zustand'
 import type { SendError, SendResult } from './lib/send'
 
-/**
- * Estado transiente da sessão (não persiste): response atual, envio em
- * andamento e o diálogo de compartilhar — que abre de vários lugares (header,
- * collection aberta, painel de sync) e por isso não pode viver num só deles.
- */
+/** Transient session state (never persisted). The share dialog lives here because
+ *  it opens from several places and cannot belong to any one of them. */
 interface SessionState {
   responses: Record<string, SendResult | SendError>
   sending: Record<string, boolean>
-  /** `collectionId` = escopo já escolhido; null = o project inteiro. */
+  /** `collectionId` = scope already chosen; null = the whole project. */
   share: { open: boolean; collectionId: string | null }
   setResponse: (requestId: string, response: SendResult | SendError) => void
   setSending: (requestId: string, sending: boolean) => void

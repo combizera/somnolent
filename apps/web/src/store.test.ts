@@ -18,8 +18,8 @@ const req = (id: string, projectId: string, collectionId: string | null): ApiReq
   body: null, bodyType: 'none', sortOrder: 0, version: 1, updatedAt: '2026-09-01T00:00:00.000Z',
 })
 
-describe('importData com environments por collection', () => {
-  it('não mescla o base importado no base de outra collection', () => {
+describe('importData with per-collection environments', () => {
+  it('never merges the imported base into another collection base', () => {
     const s = useStore.getState()
     const local = s.collections.find((c) => c.parentId === null)!
     const baseLocalAntes = s.environments.find((e) => e.isBase && e.collectionId === local.id)!
@@ -31,17 +31,17 @@ describe('importData com environments por collection', () => {
     })
 
     const depois = useStore.getState()
-    // o base importado existe, na collection importada
+    // the imported base exists, in the imported collection
     expect(depois.environments.find((e) => e.id === 'e-base')?.collectionId).toBe('imp')
-    // o base local não foi tocado
+    // the local base was left untouched
     const baseLocal = depois.environments.find((e) => e.id === baseLocalAntes.id)!
     expect(baseLocal.variables).toEqual(baseLocalAntes.variables)
     expect(baseLocal.version).toBe(baseLocalAntes.version)
   })
 
-  it('não renomeia env por colidir com nome de OUTRA collection', () => {
+  it('does not rename an env over a clash in ANOTHER collection', () => {
     const s = useStore.getState()
-    // o seed já tem "staging" na collection Exemplos
+    // the seed already has "staging" in the Examples collection
     s.importData({
       collections: [col('imp', s.openProjectId!, null)],
       environments: [env('e-stg', 'imp', 'staging')],
@@ -49,7 +49,7 @@ describe('importData com environments por collection', () => {
     expect(useStore.getState().environments.find((e) => e.id === 'e-stg')?.name).toBe('staging')
   })
 
-  it('pasta importada não ganha offset de sortOrder de topo', () => {
+  it('an imported folder gets no top-level sortOrder offset', () => {
     const s = useStore.getState()
     s.importData({
       collections: [col('raiz', s.openProjectId!, null, 0), col('filha', s.openProjectId!, 'raiz', 0)],
@@ -59,8 +59,8 @@ describe('importData com environments por collection', () => {
   })
 })
 
-describe('moveCollection reindexa só as irmãs', () => {
-  it('reordenar dentro de uma pasta não mexe na ordem de outro pai', () => {
+describe('moveCollection reindexes siblings only', () => {
+  it('reordering inside a folder leaves another parent alone', () => {
     const s = useStore.getState()
     const prj = s.openProjectId!
     useStore.setState({
@@ -74,7 +74,7 @@ describe('moveCollection reindexa só as irmãs', () => {
       ],
     })
 
-    // move A2 pra frente de A1
+    // move A2 ahead of A1
     useStore.getState().moveCollection('A2', 0)
 
     const depois = Object.fromEntries(
@@ -82,41 +82,41 @@ describe('moveCollection reindexa só as irmãs', () => {
     )
     expect(depois['A2']).toBe(0)
     expect(depois['A1']).toBe(1)
-    // B e as filhas de B ficam exatamente como estavam
+    // B and B's children stay exactly as they were
     expect(depois['B']).toBe(1)
     expect(depois['B1']).toBe(0)
     expect(depois['B2']).toBe(1)
-    // e as raízes também não foram arrastadas pra dança
+    // and the roots were not dragged into it either
     expect(depois['A']).toBe(0)
   })
 })
 
-describe('withScope: o push carrega o rootCollectionId', () => {
+describe('withScope: the push carries the rootCollectionId', () => {
   const tree = [col('root', 'p', null), col('sub', 'p', 'root')]
 
-  it('request em subpasta aponta pra collection raiz', () => {
+  it('a request in a subfolder points at the root collection', () => {
     const scoped = withScope(tree).request(req('r', 'p', 'sub'))
     expect(scoped.rootCollectionId).toBe('root')
   })
 
-  it('request direto na raiz também', () => {
+  it('a request straight in the root does too', () => {
     expect(withScope(tree).request(req('r', 'p', 'root')).rootCollectionId).toBe('root')
   })
 
-  it('request solta no project vai sem escopo (só chave de project enxerga)', () => {
+  it('a loose request goes unscoped, visible only to a project key', () => {
     expect(withScope(tree).request(req('r', 'p', null)).rootCollectionId).toBeNull()
   })
 
-  it('subpasta aponta pra raiz; a raiz aponta pra si mesma', () => {
+  it('a subfolder points at the root; the root points at itself', () => {
     expect(withScope(tree).collection(tree[1]!).rootCollectionId).toBe('root')
     expect(withScope(tree).collection(tree[0]!).rootCollectionId).toBe('root')
   })
 })
 
-describe('project local amarrado ao project do servidor', () => {
+describe('local project bound to the server project', () => {
   const remote = { id: 'srv-1', name: 'Catcher' }
 
-  it('adoptRemoteProject re-etiqueta o project aberto e o que está dentro dele', () => {
+  it('adoptRemoteProject re-tags the open project and everything inside it', () => {
     const antes = useStore.getState()
     const local = antes.openProjectId!
     const colLocal = antes.collections.find((c) => c.projectId === local)!
@@ -128,17 +128,17 @@ describe('project local amarrado ao project do servidor', () => {
     expect(s.connection.projectId).toBe(remote.id)
     expect(s.projects.map((p) => p.id)).toContain(remote.id)
     expect(s.projects.map((p) => p.id)).not.toContain(local)
-    // sem isto a sidebar filtra por projectId e não acha mais nada
+    // without this the sidebar filters by projectId and finds nothing
     expect(s.collections.find((c) => c.id === colLocal.id)!.projectId).toBe(remote.id)
     expect(s.requests.every((r) => r.projectId === remote.id)).toBe(true)
-    // updatedAt novo, senão o push incremental não levaria a re-etiquetagem
+    // fresh updatedAt, or the incremental push would not carry the re-tagging
     expect(s.collections[0]!.updatedAt > colLocal.updatedAt).toBe(true)
   })
 
-  it('enterRemoteProject limpa só o project conectado e preserva os outros', () => {
+  it('enterRemoteProject clears only the connected project', () => {
     const inicial = useStore.getState()
     const outro = inicial.openProjectId!
-    // conteúdo antigo do project remoto, de uma conexão anterior
+    // old content of the remote project, from an earlier connection
     useStore.setState({
       collections: [...inicial.collections, col('c-srv', remote.id, null)],
       requests: [...inicial.requests, req('r-srv', remote.id, 'c-srv')],
@@ -149,22 +149,22 @@ describe('project local amarrado ao project do servidor', () => {
 
     const s = useStore.getState()
     expect(s.openProjectId).toBe(remote.id)
-    // o project conectado começa vazio: o primeiro pull traz tudo
+    // the connected project starts empty: the first pull brings everything
     expect(s.collections.filter((c) => c.projectId === remote.id)).toEqual([])
     expect(s.requests.filter((r) => r.projectId === remote.id)).toEqual([])
     expect(s.environments.find((e) => e.id === 'e-srv')).toBeUndefined()
-    // e o project local desta máquina fica intacto
+    // and this machine's local project stays intact
     expect(s.collections.some((c) => c.projectId === outro)).toBe(true)
     expect(s.requests.some((r) => r.projectId === outro)).toBe(true)
     expect(s.environments.some((e) => e.collectionId !== 'c-srv')).toBe(true)
   })
 
-  it('applyRemote re-etiqueta o que chega com o projectId conectado', () => {
+  it('applyRemote re-tags what arrives with the connected projectId', () => {
     useStore.setState({
       connection: { ...useStore.getState().connection, key: 'somn_x', projectId: remote.id },
     })
 
-    // linha gravada por um cliente antigo, que subia o projectId local dele
+    // a row written by an older client, which pushed its own local projectId
     useStore.getState().applyRemote(
       {
         collections: [col('c-legado', 'projeto-de-outra-maquina', null)],
@@ -179,18 +179,18 @@ describe('project local amarrado ao project do servidor', () => {
   })
 })
 
-describe('keyring: a máquina lembra a chave de cada project', () => {
+describe('keyring: the machine remembers each project key', () => {
   const conn = (projectId: string, key: string) => ({
     scope: 'project' as const,
     role: 'write' as const,
-    label: 'esta máquina',
+    label: 'this machine',
     projectId,
     projectName: projectId,
     collectionId: null,
     key,
   })
 
-  it('connect guarda a chave e trocar de project reconecta sozinho', () => {
+  it('connect stores the key and switching project reconnects on its own', () => {
     const s = useStore.getState()
     const a = s.openProjectId!
     const b = s.addProject('Segundo')
@@ -199,26 +199,26 @@ describe('keyring: a máquina lembra a chave de cada project', () => {
     useStore.getState().connect(keyA, infoA)
     expect(useStore.getState().keyring[a]?.key).toBe('somn_a')
 
-    // troca pro project local: nada de chave, então nada de sync
+    // switch to the local project: no key, so no sync
     useStore.getState().openProject(b)
     expect(useStore.getState().connection.key).toBeNull()
 
-    // publica o segundo e volta pro primeiro: a chave do primeiro volta com ele
+    // publish the second and go back: the first key comes back with it
     const { key: keyB, ...infoB } = conn(b, 'somn_b')
     useStore.getState().connect(keyB, infoB)
     useStore.getState().openProject(a)
     expect(useStore.getState().connection.key).toBe('somn_a')
     expect(useStore.getState().connection.projectId).toBe(a)
-    // lastSyncAt é por conexão: trocar tem que forçar um pull completo
+    // lastSyncAt is per connection: switching must force a full pull
     expect(useStore.getState().lastSyncAt).toBeNull()
 
     useStore.getState().openProject(b)
     expect(useStore.getState().connection.key).toBe('somn_b')
   })
 
-  it('adoptRemoteProject guarda a chave da conexão legada', () => {
-    // Conexão salva antes de o projectId existir: quem amarra é o syncNow,
-    // que chama adoptRemoteProject sem passar por connect().
+  it('adoptRemoteProject stores the legacy connection key', () => {
+    // Connection saved before projectId existed: syncNow is what binds it,
+    // calling adoptRemoteProject without going through connect().
     const local = useStore.getState().openProjectId!
     useStore.setState({
       connection: { ...useStore.getState().connection, key: 'somn_legado', role: 'write' },
@@ -229,12 +229,12 @@ describe('keyring: a máquina lembra a chave de cada project', () => {
     const outro = useStore.getState().addProject('Outro')
     useStore.getState().openProject(outro)
     useStore.getState().openProject('srv-legado')
-    // sem gravar no keyring, voltar pro project descartaria uma chave viva
+    // without the keyring write, coming back would discard a live key
     expect(useStore.getState().connection.key).toBe('somn_legado')
     expect(local).not.toBe('srv-legado')
   })
 
-  it('desconectar esquece só a chave do project conectado', () => {
+  it('disconnecting forgets only the connected project key', () => {
     const s = useStore.getState()
     const a = s.openProjectId!
     const b = s.addProject('Segundo')
@@ -248,11 +248,11 @@ describe('keyring: a máquina lembra a chave de cada project', () => {
     const depois = useStore.getState()
     expect(depois.connection.key).toBeNull()
     expect(depois.keyring[b]).toBeUndefined()
-    // sem isto, "desconectar" e voltar pro project reconectaria sozinho
+    // without this, disconnecting and coming back would reconnect on its own
     expect(depois.keyring[a]?.key).toBe('somn_a')
   })
 
-  it('apagar o project esquece a chave dele', () => {
+  it('deleting the project forgets its key', () => {
     const s = useStore.getState()
     const a = s.openProjectId!
     const b = s.addProject('Segundo')
@@ -269,8 +269,8 @@ describe('keyring: a máquina lembra a chave de cada project', () => {
   })
 })
 
-describe('abas das requests abertas', () => {
-  /** Dois projects não entram aqui: a barra recorta por collection. */
+describe('tabs of the open requests', () => {
+  /** Two projects stay out of here: the strip slices by collection. */
   const setup = () => {
     const projectId = useStore.getState().openProjectId!
     useStore.setState({
@@ -283,7 +283,7 @@ describe('abas das requests abertas', () => {
     return projectId
   }
 
-  /** Cria n requests numa collection e devolve os ids, sem abrir aba. */
+  /** Creates n requests in a collection and returns the ids, opening no tab. */
   const seedRequests = (projectId: string, collectionId: string, ids: string[]) => {
     useStore.setState((s) => ({
       requests: [...s.requests, ...ids.map((id) => req(id, projectId, collectionId))],
@@ -291,7 +291,7 @@ describe('abas das requests abertas', () => {
     return ids
   }
 
-  it('selecionar uma request abre a aba dela, à direita', () => {
+  it('selecting a request opens its tab, at the right', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['r1', 'r2'])
 
@@ -301,7 +301,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().openTabs).toEqual(['r1', 'r2'])
   })
 
-  it('reabrir uma aba já aberta não a move de posição', () => {
+  it('reopening an already open tab does not move it', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['r1', 'r2', 'r3'])
     ;['r1', 'r2', 'r3'].forEach((id) => useStore.getState().selectRequest(id))
@@ -312,7 +312,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().selectedRequestId).toBe('r1')
   })
 
-  it('voltar pro início não abre aba nenhuma', () => {
+  it('going back home opens no tab at all', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['r1'])
     useStore.getState().selectRequest('r1')
@@ -323,7 +323,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().selectedRequestId).toBeNull()
   })
 
-  it('na 11ª aba a mais antiga sai e as 10 últimas ficam', () => {
+  it('on the 11th tab the oldest leaves and the last 10 stay', () => {
     const projectId = setup()
     const ids = Array.from({ length: 11 }, (_, i) => `r${i}`)
     seedRequests(projectId, 'A', ids)
@@ -334,7 +334,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().openTabs).toHaveLength(MAX_TABS_PER_COLLECTION)
   })
 
-  it('o teto é por collection: encher A não fecha aba de B', () => {
+  it('the cap is per collection: filling A closes no tab of B', () => {
     const projectId = setup()
     const inA = Array.from({ length: MAX_TABS_PER_COLLECTION }, (_, i) => `a${i}`)
     seedRequests(projectId, 'A', inA)
@@ -346,7 +346,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().openTabs).toEqual(['b1', ...inA])
   })
 
-  it('request em subpasta conta no teto da collection raiz', () => {
+  it('a request in a subfolder counts toward the root collection cap', () => {
     const projectId = setup()
     const raiz = Array.from({ length: MAX_TABS_PER_COLLECTION }, (_, i) => `a${i}`)
     seedRequests(projectId, 'A', raiz)
@@ -355,11 +355,11 @@ describe('abas das requests abertas', () => {
     raiz.forEach((id) => useStore.getState().selectRequest(id))
     useStore.getState().selectRequest('dentro')
 
-    // 'sub' pende de 'A', então a 11ª derruba a mais antiga de 'A'
+    // 'sub' hangs off 'A', so the 11th evicts the oldest of 'A'
     expect(useStore.getState().openTabs).toEqual([...raiz.slice(1), 'dentro'])
   })
 
-  it('fechar a aba ativa cai na vizinha da direita', () => {
+  it('closing the active tab falls to the right neighbour', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['r1', 'r2', 'r3'])
     ;['r1', 'r2', 'r3'].forEach((id) => useStore.getState().selectRequest(id))
@@ -371,7 +371,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().selectedRequestId).toBe('r3')
   })
 
-  it('fechar a última aba ativa cai na da esquerda', () => {
+  it('closing the last active tab falls to the left one', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['r1', 'r2'])
     ;['r1', 'r2'].forEach((id) => useStore.getState().selectRequest(id))
@@ -381,7 +381,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().selectedRequestId).toBe('r1')
   })
 
-  it('fechar aba que não é a ativa não mexe na seleção', () => {
+  it('closing a tab that is not active leaves the selection alone', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['r1', 'r2'])
     ;['r1', 'r2'].forEach((id) => useStore.getState().selectRequest(id))
@@ -391,7 +391,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().selectedRequestId).toBe('r2')
   })
 
-  it('a vizinha nunca é de outra collection', () => {
+  it('the neighbour is never from another collection', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['a1'])
     seedRequests(projectId, 'B', ['b1'])
@@ -400,12 +400,12 @@ describe('abas das requests abertas', () => {
 
     useStore.getState().closeTab('a1')
 
-    // sem vizinha em A, a seleção esvazia — não pula pra B e troca o environment
+    // with no neighbour in A the selection empties instead of jumping to B
     expect(useStore.getState().selectedRequestId).toBeNull()
     expect(useStore.getState().openTabs).toEqual(['b1'])
   })
 
-  it('fechar as outras deixa só a clicada, e ativa', () => {
+  it('closing the others leaves only the clicked one, active', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['r1', 'r2', 'r3'])
     ;['r1', 'r2', 'r3'].forEach((id) => useStore.getState().selectRequest(id))
@@ -416,7 +416,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().selectedRequestId).toBe('r1')
   })
 
-  it('fechar as outras poupa as abas das outras collections', () => {
+  it('closing the others spares the tabs of other collections', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['a1', 'a2'])
     seedRequests(projectId, 'B', ['b1'])
@@ -427,7 +427,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().openTabs).toEqual(['b1', 'a1'])
   })
 
-  it('fechar todas limpa a collection em contexto e a seleção', () => {
+  it('closing all clears the collection in context and the selection', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['a1', 'a2'])
     seedRequests(projectId, 'B', ['b1'])
@@ -439,7 +439,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().selectedRequestId).toBeNull()
   })
 
-  it('apagar a request fecha a aba dela', () => {
+  it('deleting the request closes its tab', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['r1', 'r2'])
     ;['r1', 'r2'].forEach((id) => useStore.getState().selectRequest(id))
@@ -449,7 +449,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().openTabs).toEqual(['r2'])
   })
 
-  it('apagar a collection fecha as abas das requests dela', () => {
+  it('deleting the collection closes the tabs of its requests', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['a1'])
     seedRequests(projectId, 'sub', ['dentro'])
@@ -458,11 +458,11 @@ describe('abas das requests abertas', () => {
 
     useStore.getState().deleteCollection('A')
 
-    // 'sub' pende de 'A' e cai junto
+    // 'sub' hangs off 'A' and goes with it
     expect(useStore.getState().openTabs).toEqual(['b1'])
   })
 
-  it('request apagada no remoto não sobra como aba', () => {
+  it('a request deleted on the remote leaves no tab behind', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['r1', 'r2'])
     ;['r1', 'r2'].forEach((id) => useStore.getState().selectRequest(id))
@@ -475,7 +475,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().openTabs).toEqual(['r2'])
   })
 
-  it('request nova nasce com aba', () => {
+  it('a new request is born with a tab', () => {
     setup()
     const id = useStore.getState().addRequest('A')
 
@@ -483,7 +483,7 @@ describe('abas das requests abertas', () => {
     expect(useStore.getState().selectedRequestId).toBe(id)
   })
 
-  it('duplicar abre a aba da cópia sem fechar a do original', () => {
+  it('duplicating opens the copy tab without closing the original', () => {
     const projectId = setup()
     seedRequests(projectId, 'A', ['r1'])
     useStore.getState().selectRequest('r1')
