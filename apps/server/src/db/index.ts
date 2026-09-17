@@ -3,7 +3,7 @@ import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core'
 import pg from 'pg'
 import * as schema from './schema.js'
 
-/** Tipo comum aos drivers node-postgres (produção) e PGlite (testes). */
+/** Type shared by the node-postgres (production) and PGlite (test) drivers. */
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>
 
 export function createDb(databaseUrl: string): { db: Db; pool: pg.Pool } {

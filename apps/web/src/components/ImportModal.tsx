@@ -35,7 +35,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
     try {
       name = new URL(parsed.url.replace(/\{\{[^}]*\}\}/g, 'x')).pathname || parsed.url
     } catch {
-      // URL com template não resolvido: usa a própria string como nome.
+      // URL with an unresolved template: use the string itself as the name.
     }
     store.updateRequest(id, {
       name,
@@ -75,7 +75,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Não consegui importar. Cole um export do Insomnia ou um comando curl.',
+          : 'Could not import. Paste an Insomnia export or a curl command.',
       )
     } finally {
       setBusy(false)
@@ -94,14 +94,14 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         {summary ? (
           <>
             <div>
-              <h2 className="text-sm font-semibold text-ink">Importado</h2>
+              <h2 className="text-sm font-semibold text-ink">Imported</h2>
               <p className="text-sm text-ink-faint">{summary.format}</p>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               {[
                 { label: 'requests', value: summary.requests },
-                { label: 'pastas', value: summary.collections },
+                { label: 'folders', value: summary.collections },
                 { label: 'environments', value: summary.environments },
               ].map((item) => (
                 <div
@@ -118,7 +118,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
 
             {summary.warnings.length > 0 && (
               <div className="flex flex-col gap-1.5 rounded-md border border-warn/40 bg-warn/10 p-3">
-                <p className="text-sm font-semibold text-warn">Vale conferir</p>
+                <p className="text-sm font-semibold text-warn">Worth checking</p>
                 <ul className="flex flex-col gap-1">
                   {summary.warnings.map((w, i) => (
                     <li key={i} className="text-sm leading-relaxed text-ink-dim">
@@ -133,18 +133,18 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
               onClick={onClose}
               className="self-end rounded-md bg-brand px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-hi"
             >
-              Fechar
+              Close
             </button>
           </>
         ) : (
           <>
             <div>
-              <h2 className="text-sm font-semibold text-ink">Importar</h2>
+              <h2 className="text-sm font-semibold text-ink">Import</h2>
               <p className="text-sm text-ink-faint">
-                Cole um export do Insomnia — <span className="text-ink-dim">v5 (YAML)</span> ou{' '}
-                <span className="text-ink-dim">v4 (JSON)</span> — ou um{' '}
-                <span className="text-ink-dim">comando curl</span>. O formato é detectado
-                sozinho.
+                Paste an Insomnia export — <span className="text-ink-dim">v5 (YAML)</span> or{' '}
+                <span className="text-ink-dim">v4 (JSON)</span> — or a{' '}
+                <span className="text-ink-dim">curl command</span>. The format is detected
+                on its own.
               </p>
             </div>
             <textarea
@@ -152,7 +152,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
               onChange={(e) => setText(e.target.value)}
               spellCheck={false}
               placeholder={
-                'type: collection.insomnia.rest/5.0\nname: Minha API\ncollection:\n  - url: ...\n\nou\n\ncurl -X POST https://api.com/login -d \'{...}\''
+                'type: collection.insomnia.rest/5.0\nname: My API\ncollection:\n  - url: ...\n\nor\n\ncurl -X POST https://api.com/login -d \'{...}\''
               }
               className="h-56 w-full resize-none rounded-md border border-line bg-app p-3 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
             />
@@ -162,14 +162,14 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
                 onClick={onClose}
                 className="rounded-md px-3 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={doImport}
                 disabled={!text.trim() || busy}
                 className="rounded-md bg-brand px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-hi disabled:opacity-40"
               >
-                {busy ? 'Importando…' : 'Importar'}
+                {busy ? 'Importing…' : 'Import'}
               </button>
             </div>
           </>

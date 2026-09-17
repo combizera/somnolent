@@ -15,19 +15,19 @@ export function toMethod(raw: string | undefined): HttpMethod {
   return (HTTP_METHODS.has(upper) ? upper : "GET") as HttpMethod;
 }
 
-/** Converte a sintaxe de template do Insomnia ({{ _.var }}) pra nossa ({{ var }}). */
+/** Converts Insomnia's template syntax ({{ _.var }}) into ours ({{ var }}). */
 export function convertTemplates(text: string): string {
   return text.replace(/\{\{\s*_\.([\w.-]+)\s*\}\}/g, "{{ $1 }}");
 }
 
-/** Achata o objeto `data` do environment em chave→string (aninhado vira "a.b"). */
+/** Flattens the environment `data` object into key→string (nested becomes "a.b"). */
 export function flattenData(
   data: Record<string, unknown>,
   prefix = "",
 ): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(data)) {
-    if (!key.trim()) continue; // o Insomnia deixa linhas em branco como "": ""
+    if (!key.trim()) continue; // Insomnia leaves blank rows as "": ""
     const full = prefix ? `${prefix}.${key}` : key;
     if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       Object.assign(out, flattenData(value as Record<string, unknown>, full));
@@ -41,8 +41,8 @@ export function flattenData(
 }
 
 /**
- * Chaves que guardam credencial viram variáveis secretas: o valor fica só nesta
- * máquina e não sobe no sync.
+ * Keys holding credentials become secret variables: the value stays on this
+ * machine and never goes up in the sync.
  */
 const SECRET_KEY = /(token|secret|password|passwd|pwd|api[_-]?key|authorization)/i;
 
@@ -61,7 +61,7 @@ export function toVariables(
   }));
 }
 
-/** Ordena irmãos pelo sortKey do Insomnia; sem sortKey, mantém a ordem do arquivo. */
+/** Sorts siblings by Insomnia's sortKey; without one, keeps the file order. */
 export function bySortKey<T extends { meta?: { sortKey?: number } }>(
   nodes: T[],
 ): T[] {

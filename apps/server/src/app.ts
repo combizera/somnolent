@@ -10,18 +10,17 @@ import { accessKeys, entities, projects } from './db/schema.js'
 export interface AppOptions {
   db: Db
   /**
-   * Se definido, criar project exige este segredo no header
-   * `X-Create-Token`. Vazio deixa a criação livre — bom pro servidor local,
-   * ruim pra uma instância exposta.
+   * When set, creating a project requires this secret in the `X-Create-Token`
+   * header. Empty leaves creation open — fine locally, bad when exposed.
    */
   createToken?: string
 }
 
-/** O que uma chave abre. Resolvido no servidor, nunca informado pelo cliente. */
+/** What a key opens. Resolved on the server, never taken from the client. */
 export interface Access {
   keyId: string
   projectId: string
-  /** null = chave de project (abre tudo); id = chave de uma collection só. */
+  /** null = project key (opens everything); id = key for a single collection. */
   collectionId: string | null
   role: 'write' | 'read'
   label: string
@@ -44,7 +43,7 @@ interface SyncBody {
 
 declare module 'fastify' {
   interface FastifyRequest {
-    /** Preenchido pelos guards `requireKey`/`requireWrite`. */
+    /** Filled in by the `requireKey`/`requireWrite` guards. */
     access?: Access
   }
 }
@@ -59,7 +58,7 @@ export function buildApp({ db, createToken }: AppOptions) {
   app.register(cors, { origin: true })
   app.register(websocket)
 
-  // Salas de WebSocket por project, para notificar mudanças em tempo real.
+  // WebSocket rooms per project, to notify changes in real time.
   const rooms = new Map<string, Set<WebSocket>>()
   const broadcast = (projectId: string, except?: string) => {
     const room = rooms.get(projectId)
@@ -70,11 +69,11 @@ export function buildApp({ db, createToken }: AppOptions) {
     }
   }
 
-  // Chave dona de cada socket aberto: é o que permite derrubar, na revogação,
-  // exatamente os sockets daquela chave.
+  // Owning key of each open socket: it is what lets a revoke drop exactly
+  // the sockets of that key.
   const socketKeys = new Map<WebSocket, string>()
 
-  /** Lê a chave do header e resolve o escopo; null se inválida ou revogada. */
+  /** Reads the key from the header and resolves its scope; null if invalid or revoked. */
   async function resolveKey(raw: string | undefined): Promise<Access | null> {
     if (!raw?.startsWith(KEY_PREFIX)) return null
     const [row] = await db
@@ -82,7 +81,7 @@ export function buildApp({ db, createToken }: AppOptions) {
       .from(accessKeys)
       .where(and(eq(accessKeys.tokenHash, hashKey(raw)), isNull(accessKeys.revokedAt)))
     if (!row) return null
-    // marca o uso sem bloquear a resposta: é sinal de chave viva, não transação
+    // mark the use without blocking the response: a liveness hint, not a transaction
     void db
       .update(accessKeys)
       .set({ lastUsedAt: new Date() })
@@ -104,13 +103,13 @@ export function buildApp({ db, createToken }: AppOptions) {
       : undefined
   }
 
-  /** Anexa o acesso à request; 401 se a chave não abre nada. */
+  /** Attaches the access to the request; 401 when the key opens nothing. */
   const requireKey = async (
     req: { headers: Record<string, unknown>; access?: Access },
     reply: { code: (c: number) => { send: (b: unknown) => void } },
   ) => {
     const access = await resolveKey(bearerOf(req))
-    if (!access) return reply.code(401).send({ error: 'Chave inválida ou revogada.' })
+    if (!access) return reply.code(401).send({ error: 'Invalid or revoked key.' })
     req.access = access
   }
 
@@ -120,13 +119,13 @@ export function buildApp({ db, createToken }: AppOptions) {
   ) => {
     await requireKey(req, reply)
     if (req.access && req.access.role !== 'write') {
-      reply.code(403).send({ error: 'Esta chave é somente leitura.' })
+      reply.code(403).send({ error: 'This key is read-only.' })
     }
   }
 
   /**
-   * Collection raiz de uma entidade que chega no sync. O cliente já manda a
-   * hierarquia; a collection raiz é a que não tem pai.
+   * Root collection of an entity arriving in the sync. The client already sends
+   * the hierarchy; the root collection is the one without a parent.
    */
   const rootOf = (kind: Kind, entity: SyncEntity): string | null => {
     if (kind === 'collection') {
@@ -138,18 +137,18 @@ export function buildApp({ db, createToken }: AppOptions) {
     return (entity.rootCollectionId as string | undefined) ?? null
   }
 
-  /** Uma entidade está no escopo da chave? Chave de project abre tudo. */
+  /** Is an entity within the key's scope? A project key opens everything. */
   const inScope = (access: Access, rootCollectionId: string | null | undefined) =>
     access.collectionId === null || rootCollectionId === access.collectionId
 
-  // ---------- projects e chaves ----------
+  // ---------- projects and keys ----------
 
   app.post<{ Body: { name: string } }>('/projects', async (req, reply) => {
     if (createToken && req.headers['x-create-token'] !== createToken) {
-      return reply.code(403).send({ error: 'Este servidor não aceita criação aberta de project.' })
+      return reply.code(403).send({ error: 'This server does not accept open project creation.' })
     }
     const name = req.body?.name?.trim()
-    if (!name) return reply.code(400).send({ error: 'Nome do project é obrigatório.' })
+    if (!name) return reply.code(400).send({ error: 'The project name is required.' })
 
     const [project] = await db.insert(projects).values({ name }).returning()
     const raw = newKey()
@@ -158,13 +157,13 @@ export function buildApp({ db, createToken }: AppOptions) {
       scope: 'project',
       projectId: project!.id,
       role: 'write',
-      label: 'primeira chave',
+      label: 'first key',
     })
-    // A chave crua aparece uma vez: daqui em diante só existe o hash.
+    // The raw key shows up once: from here on only the hash exists.
     return { id: project!.id, name: project!.name, key: raw }
   })
 
-  /** O que esta chave abre — o cliente chama antes de baixar qualquer coisa. */
+  /** What this key opens — the client calls it before downloading anything. */
   app.get('/me', { onRequest: [requireKey] }, async (req) => {
     const access = req.access!
     const [project] = await db.select().from(projects).where(eq(projects.id, access.projectId))
@@ -191,7 +190,7 @@ export function buildApp({ db, createToken }: AppOptions) {
       .select()
       .from(accessKeys)
       .where(and(eq(accessKeys.projectId, access.projectId), isNull(accessKeys.revokedAt)))
-    // Chave de collection só enxerga as chaves da própria collection.
+    // A collection key only sees the keys of its own collection.
     const visible = rows.filter((r) => inScope(access, r.collectionId ?? null) || r.scope === 'project')
     return {
       keys: visible.map((r) => ({
@@ -213,12 +212,12 @@ export function buildApp({ db, createToken }: AppOptions) {
     async (req, reply) => {
       const access = req.access!
       const label = req.body?.label?.trim()
-      if (!label) return reply.code(400).send({ error: 'Dê um rótulo à chave, ex.: "meu Mac".' })
+      if (!label) return reply.code(400).send({ error: 'Give the key a label, e.g. "my Mac".' })
 
       const collectionId = req.body?.collectionId ?? null
-      // Uma chave de collection não pode emitir chave mais ampla que ela mesma.
+      // A collection key cannot issue a key broader than itself.
       if (access.collectionId && collectionId !== access.collectionId) {
-        return reply.code(403).send({ error: 'Esta chave só emite chaves da própria collection.' })
+        return reply.code(403).send({ error: 'This key only issues keys for its own collection.' })
       }
 
       const raw = newKey()
@@ -244,19 +243,19 @@ export function buildApp({ db, createToken }: AppOptions) {
       const access = req.access!
       const [row] = await db.select().from(accessKeys).where(eq(accessKeys.id, req.params.id))
       if (!row || row.projectId !== access.projectId) {
-        return reply.code(404).send({ error: 'Chave não encontrada.' })
+        return reply.code(404).send({ error: 'Key not found.' })
       }
       if (access.collectionId && row.collectionId !== access.collectionId) {
-        return reply.code(403).send({ error: 'Esta chave não alcança a chave que você quer revogar.' })
+        return reply.code(403).send({ error: 'This key does not reach the key you want to revoke.' })
       }
       await db
         .update(accessKeys)
         .set({ revokedAt: new Date() })
         .where(eq(accessKeys.id, req.params.id))
-      // derruba os sockets abertos com a chave revogada — sem isto, quem foi
-      // cortado continuaria recebendo cada mudança em tempo real
+      // drop the sockets opened with the revoked key — without this, whoever
+      // was cut off would keep receiving every change in real time
       for (const [socket, keyId] of socketKeys) {
-        if (keyId === req.params.id) socket.close(4001, 'chave revogada')
+        if (keyId === req.params.id) socket.close(4001, 'revoked key')
       }
       return { revoked: true }
     },
@@ -274,17 +273,17 @@ export function buildApp({ db, createToken }: AppOptions) {
       KINDS.some((kind) => (deletes[`${kind}s`]?.length ?? 0) > 0)
 
     if (pushed && access.role !== 'write') {
-      return reply.code(403).send({ error: 'Esta chave é somente leitura.' })
+      return reply.code(403).send({ error: 'This key is read-only.' })
     }
 
     for (const kind of KINDS) {
       for (const entity of changes[`${kind}s`] ?? []) {
         if (!entity?.id || !entity.updatedAt) continue
         const rootCollectionId = rootOf(kind, entity)
-        // Uma chave de collection não escreve fora da própria collection.
+        // A collection key does not write outside its own collection.
         if (!inScope(access, rootCollectionId)) continue
         const updatedAt = new Date(entity.updatedAt)
-        // Last-write-wins: só grava se for mais novo que o que está no servidor.
+        // Last-write-wins: only writes when it is newer than what the server has.
         await db
           .insert(entities)
           .values({
@@ -319,8 +318,8 @@ export function buildApp({ db, createToken }: AppOptions) {
       }
     }
 
-    // Devolve tudo que mudou no servidor desde o último sync do cliente,
-    // recortado pelo escopo da chave.
+    // Returns everything changed on the server since the client's last sync,
+    // cut down to the key's scope.
     const scopeFilter = access.collectionId
       ? eq(entities.rootCollectionId, access.collectionId)
       : sql`true`
@@ -342,29 +341,29 @@ export function buildApp({ db, createToken }: AppOptions) {
         .map((r) => r.id)
     }
 
-    // Só notifica a sala se este push realmente trouxe mudanças —
-    // senão cada pull dispara outro pull e a sala entra em loop.
+    // Only notify the room when this push really carried changes — otherwise
+    // each pull triggers another and the room loops.
     if (pushed) broadcast(projectId, access.keyId)
 
     return { now: now.toISOString(), changes: out, deletes: tombstones }
   })
 
   // ---------- websocket ----------
-  // Precisa estar num escopo registrado DEPOIS do plugin websocket carregar,
-  // senão a rota vira um GET comum e o handshake falha com 500.
+  // Must sit in a scope registered AFTER the websocket plugin loads, or the
+  // route becomes a plain GET and the handshake fails with a 500.
   app.register(async (scope) => {
     scope.get(
       '/sync/ws',
       { websocket: true },
       async (socket, req) => {
-        // A chave vai no subprotocolo, não na query: query entra em log de acesso.
+        // The key rides the subprotocol, not the query: queries land in access logs.
         const offered = req.headers['sec-websocket-protocol']
         const raw =
           (typeof offered === 'string' ? offered.split(',').map((v) => v.trim()) : [])
             .find((v) => v.startsWith(KEY_PREFIX)) ?? bearerOf(req)
         const access = await resolveKey(raw)
         if (!access) {
-          socket.close(4001, 'chave inválida')
+          socket.close(4001, 'invalid key')
           return
         }
         const room = rooms.get(access.projectId) ?? new Set()
@@ -379,7 +378,7 @@ export function buildApp({ db, createToken }: AppOptions) {
     )
   })
 
-  // ---------- proxy CORS para a versão web ----------
+  // ---------- CORS proxy for the web build ----------
 
   app.post<{ Body: { url: string; method: string; headers: Record<string, string>; body: string | null } }>(
     '/proxy',
@@ -390,14 +389,14 @@ export function buildApp({ db, createToken }: AppOptions) {
       try {
         parsed = new URL(url)
       } catch {
-        return reply.code(400).send({ error: 'URL inválida.' })
+        return reply.code(400).send({ error: 'Invalid URL.' })
       }
       if (!['http:', 'https:'].includes(parsed.protocol)) {
-        return reply.code(400).send({ error: 'Só http/https são suportados.' })
+        return reply.code(400).send({ error: 'Only http/https are supported.' })
       }
-      // Guarda mínima contra SSRF no MVP: bloqueia metadata de cloud e loopback.
+      // Minimal SSRF guard for the MVP: blocks cloud metadata and loopback.
       if (['169.254.169.254', 'metadata.google.internal', 'localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(parsed.hostname)) {
-        return reply.code(400).send({ error: 'Host não permitido pelo proxy.' })
+        return reply.code(400).send({ error: 'Host not allowed by the proxy.' })
       }
       try {
         const res = await fetch(parsed, {
@@ -416,7 +415,7 @@ export function buildApp({ db, createToken }: AppOptions) {
         }
       } catch (err) {
         return reply.code(502).send({
-          error: err instanceof Error ? err.message : 'Falha ao alcançar o destino.',
+          error: err instanceof Error ? err.message : 'Failed to reach the target.',
         })
       }
     },

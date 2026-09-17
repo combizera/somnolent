@@ -31,13 +31,11 @@ const uid = () => crypto.randomUUID()
 const MAX_HISTORY_PER_REQUEST = 20
 const MAX_HISTORY_BODY = 100_000
 
-/**
- * Teto de abas POR collection, não global: a barra mostra uma collection por
- * vez, então o teto de uma não pode comer as abas da outra.
- */
+/** Tab cap is PER collection, not global: the strip shows one collection at a
+ *  time, so one cap must not eat another collection's tabs. */
 export const MAX_TABS_PER_COLLECTION = 10
 
-/** O que basta pra saber quais abas aparecem e sob qual collection. */
+/** Just enough to tell which tabs show, and under which collection. */
 interface TabContext {
   collections: Collection[]
   requests: ApiRequest[]
@@ -45,11 +43,8 @@ interface TabContext {
   openCollectionId: string | null
 }
 
-/**
- * Collection raiz de uma request — é por ela que a barra recorta as abas.
- * `null` cobre dois casos de uma vez: request que não existe mais e request
- * fora de collection. Nenhum dos dois aparece com uma collection aberta.
- */
+/** Root collection of a request — how the strip slices its tabs. `null` covers
+ *  both a vanished request and one outside any collection. */
 function tabScope(
   collections: Collection[],
   requests: ApiRequest[],
@@ -60,22 +55,15 @@ function tabScope(
   return rootCollectionOf(collections, request.collectionId)?.id ?? null
 }
 
-/**
- * Collection que a barra está mostrando. Mesma regra do contexto de variáveis
- * (`useContextCollectionId`) de propósito: a barra e o environment ativo têm
- * que concordar sobre onde a pessoa está, senão clicar numa aba trocaria o
- * environment sem trocar a barra.
- */
+/** Same rule as the variable context on purpose: strip and active environment
+ *  must agree on where the person is, or a tab click would swap one alone. */
 function openScope(s: TabContext): string | null {
   const selected = s.requests.find((r) => r.id === s.selectedRequestId)
   return rootCollectionOf(s.collections, selected?.collectionId ?? s.openCollectionId)?.id ?? null
 }
 
-/**
- * Abre a aba de uma request à direita das que já estão. Passou do teto, sai a
- * mais antiga DA MESMA collection: a ordem na barra não se mexe sozinha, e
- * reabrir é um clique na sidebar.
- */
+/** Adds the tab at the right. Over the cap, the oldest tab OF THE SAME
+ *  collection leaves: the strip never reorders itself, and reopening is one click. */
 function withTab(
   tabs: string[],
   collections: Collection[],
@@ -92,10 +80,8 @@ function withTab(
   return next.filter((id) => !evicted.has(id))
 }
 
-/**
- * A ordem da sidebar vive em `sortOrder`, não na ordem do array: o sync manda
- * cada entidade por conta própria, então a posição precisa viajar com ela.
- */
+/** Sidebar order lives in `sortOrder`, not in array order: sync sends each entity
+ *  on its own, so the position has to travel with it. */
 export const bySortOrder = <T extends { sortOrder: number }>(a: T, b: T) =>
   a.sortOrder - b.sortOrder
 
@@ -105,17 +91,17 @@ const nextSort = (items: { sortOrder: number }[]) =>
 function seed() {
   const project: Project = {
     id: uid(),
-    name: 'Pessoal',
+    name: 'Personal',
     sortOrder: 0,
     version: 1,
     updatedAt: now(),
   }
-  // Os environments pertencem a uma collection, então o seed precisa de uma.
+  // Environments belong to a collection, so the seed needs one.
   const collection: Collection = {
     id: uid(),
     projectId: project.id,
     parentId: null,
-    name: 'Exemplos',
+    name: 'Examples',
     sortOrder: 0,
     version: 1,
     updatedAt: now(),
@@ -162,7 +148,7 @@ function seed() {
     id: uid(),
     projectId: project.id,
     collectionId: collection.id,
-    name: 'Exemplo — GET com vars',
+    name: 'Example — GET with vars',
     method: 'GET',
     url: '{{ base_url }}/get',
     headers: [
@@ -193,17 +179,14 @@ export interface Connection {
   scope: 'project' | 'collection' | null
   role: 'write' | 'read' | null
   label: string | null
-  /** Id do project NO SERVIDOR — e também do project local, depois de amarrado. */
+  /** The project id ON THE SERVER — and of the local project too, once bound. */
   projectId: string | null
   projectName: string | null
   collectionId: string | null
 }
 
-/**
- * Grava a conexão no keyring. Toda action que mexe em `connection` passa por
- * aqui: sem isso o keyring fica dessincronizado e trocar de project descarta
- * uma chave viva.
- */
+/** Every action that touches `connection` goes through here, or the keyring
+ *  drifts and switching project throws away a live key. */
 const remember = (keyring: Record<string, Connection>, connection: Connection) =>
   connection.key && connection.projectId
     ? { ...keyring, [connection.projectId]: connection }
@@ -233,48 +216,31 @@ export interface PendingDeletes {
 
 interface AppState {
   projects: Project[]
-  /** Project aberto no seletor do header — escolha local, não sincroniza. */
+  /** Project open in the header picker — a local choice, never synced. */
   openProjectId: string | null
   collections: Collection[]
   requests: ApiRequest[]
   environments: Environment[]
-  /**
-   * Environment ativo por collection: dá pra estar em prod numa collection e
-   * em local na outra. Escolha local, não sincroniza.
-   */
+  /** Active environment per collection, so prod here and local there is possible.
+   *  A local choice, never synced. */
   activeEnvByCollection: Record<string, string | null>
   selectedRequestId: string | null
-  /**
-   * Collection aberta na sidebar (navegação em 2 níveis, como o Insomnia).
-   * É escolha local de quem navega: não sincroniza.
-   */
+  /** Collection open in the sidebar (two-level navigation, like Insomnia).
+   *  A local choice of whoever is navigating: never synced. */
   openCollectionId: string | null
-  /**
-   * Pastas que a pessoa deixou abertas. Guardamos as ABERTAS, não as fechadas:
-   * assim pasta nova — recém-criada ou recém-importada — nasce fechada, e
-   * recarregar a página devolve exatamente o que estava aberto.
-   * Array, não Set: o persist serializa em JSON e Set viraria `{}`.
-   */
+  /** We store the OPEN folders, not the closed ones, so a brand-new folder starts
+   *  collapsed. Array, not Set: persist serializes to JSON. */
   expandedFolders: string[]
-  /**
-   * Requests abertas na barra de abas, em ordem de posição — a mais recente
-   * entra à direita. Escolha local de navegação: não sincroniza, como o
-   * `openCollectionId` e o `expandedFolders`.
-   * Array, não Set, pelo mesmo motivo: o persist serializa em JSON.
-   */
+  /** Requests open in the tab strip, in position order, newest at the right.
+   *  A local navigation choice, never synced. Array, not Set: persist uses JSON. */
   openTabs: string[]
   history: Record<string, HistoryEntry[]>
 
-  /**
-   * Conexão de sync. Não há conta: a chave é a credencial e o que ela abre
-   * (project inteiro ou uma collection) vem do servidor em /me.
-   */
+  /** Sync connection. There are no accounts: the key is the credential, and what
+   *  it opens comes from the server at /me. */
   connection: Connection
-  /**
-   * Chave de cada project que esta máquina já abriu. É o que faz compartilhar
-   * ser uma ação repetível em vez de um momento único: ninguém precisa ter
-   * anotado a chave, e trocar de project no header reconecta sozinho.
-   */
+  /** One key per project this machine has opened: what makes sharing repeatable
+   *  instead of a one-shot moment nobody wrote down. */
   keyring: Record<string, Connection>
   lastSyncAt: string | null
   pendingDeletes: PendingDeletes
@@ -283,21 +249,11 @@ interface AppState {
   disconnect: () => void
   setLastSyncAt: (at: string) => void
   clearPendingDeletes: (pushed: PendingDeletes) => void
-  /**
-   * Amarra o project local ao project do servidor: o id local passa a ser o do
-   * servidor. Sem isto as entidades sobem com um `projectId` que só existe
-   * nesta máquina, e quem entra depois puxa tudo pra um project que não tem —
-   * a sidebar filtra por `projectId` e a tela fica vazia.
-   * Usado ao criar um project (o project aberto vira o compartilhado) e ao
-   * reconectar uma conexão salva antes de o `projectId` existir.
-   */
+  /** Binds the local project to the server's id. Otherwise rows go up with a
+   *  `projectId` only this machine knows, and the next person sees an empty sidebar. */
   adoptRemoteProject: (project: { id: string; name: string }) => void
-  /**
-   * Entra no project de outra pessoa: cria o project local com o id do
-   * servidor e limpa só o que houver dentro dele — o primeiro pull traz tudo.
-   * Os outros projects locais ficam intactos: agora só o project conectado
-   * sincroniza.
-   */
+  /** Joins someone else's project: creates it locally with the server's id and
+   *  clears only what is inside it — the first pull brings everything back. */
   enterRemoteProject: (project: { id: string; name: string }) => void
   applyRemote: (changes: RemoteChanges, deletes: Partial<PendingDeletes>) => void
 
@@ -307,7 +263,7 @@ interface AppState {
   openProject: (id: string) => void
 
   addCollection: (name: string) => string
-  /** Entra numa collection (ou volta pra lista, com null). */
+  /** Enters a collection (or goes back to the list, with null). */
   openCollection: (id: string | null) => void
   toggleFolder: (id: string) => void
   expandFolders: (ids: string[]) => void
@@ -321,16 +277,16 @@ interface AppState {
   deleteRequest: (id: string) => void
   duplicateRequest: (id: string) => void
   selectRequest: (id: string | null) => void
-  /** Abre (ou traz pra frente) a aba de uma request e a seleciona. */
+  /** Opens (or brings forward) a request's tab and selects it. */
   openTab: (id: string) => void
   closeTab: (id: string) => void
-  /** Fecha as outras abas DA MESMA collection e deixa esta ativa. */
+  /** Closes the other tabs OF THE SAME collection and leaves this one active. */
   closeOtherTabs: (id: string) => void
-  /** Fecha todas as abas da collection em contexto. */
+  /** Closes every tab of the collection in context. */
   closeAllTabs: () => void
-  /** Move uma request para uma pasta (ou raiz) na posição indicada. */
+  /** Moves a request into a folder (or the root) at the given position. */
   moveRequest: (id: string, collectionId: string | null, index: number) => void
-  /** Reordena uma pasta entre as outras. */
+  /** Reorders a folder among its siblings. */
   moveCollection: (id: string, index: number) => void
   importData: (data: {
     collections?: Collection[]
@@ -339,7 +295,7 @@ interface AppState {
   }) => void
 
   addEnvironment: (collectionId: string) => string
-  /** Reordena os environments na lista do gerenciador (o base também entra). */
+  /** Reorders environments in the manager list (the base one included). */
   moveEnvironment: (id: string, index: number) => void
   updateEnvironment: (id: string, patch: Partial<Environment>) => void
   deleteEnvironment: (id: string) => void
@@ -369,8 +325,8 @@ export const useStore = create<AppState>()(
           return { connection, keyring: remember(s.keyring, connection), lastSyncAt: null }
         }),
 
-      // "Desconectar esta máquina" tem que esquecer a chave também — senão
-      // trocar de project e voltar reconectaria sozinho.
+      // "Disconnect this machine" has to forget the key too, or switching away
+      // and back would reconnect on its own.
       disconnect: () =>
         set((s) => {
           const keyring = { ...s.keyring }
@@ -398,12 +354,12 @@ export const useStore = create<AppState>()(
           const at = now()
           const from = s.openProjectId
           const connection = { ...s.connection, projectId: id, projectName: name }
-          // Este caminho também roda pela reconexão legada, que não passa por
-          // `connect` — sem gravar aqui, a chave viva se perderia na troca.
+          // The legacy reconnect also runs this path without going through
+          // `connect`; not writing here would lose the live key.
           const keyring = remember(s.keyring, connection)
           if (!from || from === id) {
-            // Já amarrado, ou não havia project aberto: só garante que ele
-            // existe na lista com o nome do servidor.
+            // Already bound, or no project was open: just make sure it exists
+            // in the list under the server's name.
             return {
               connection,
               keyring,
@@ -418,8 +374,8 @@ export const useStore = create<AppState>()(
                   ],
             }
           }
-          // `updatedAt` novo em tudo que foi re-etiquetado: o push manda só o
-          // que mudou depois do último sync, e aqui o `projectId` mudou.
+          // Fresh `updatedAt` on everything re-tagged: push only sends what
+          // changed since the last sync, and here the `projectId` changed.
           return {
             connection,
             keyring,
@@ -456,8 +412,8 @@ export const useStore = create<AppState>()(
                   ...s.projects,
                   { id, name, sortOrder: nextSort(s.projects), version: 1, updatedAt: now() },
                 ],
-            // Limpa só o project conectado — os outros projects locais desta
-            // máquina não sincronizam e não têm por que ser apagados.
+            // Clear only the connected project — the other local projects do
+            // not sync and have no reason to be wiped.
             collections: s.collections.filter((c) => c.projectId !== id),
             requests,
             environments: s.environments.filter((e) => !mine.has(e.collectionId)),
@@ -476,8 +432,8 @@ export const useStore = create<AppState>()(
 
       applyRemote: (changes, deletes) =>
         set((s) => {
-          // Preserva a referência do array quando nada muda — senão o engine
-          // de sync interpreta o próprio applyRemote como edição e loopa.
+          // Keep the array reference when nothing changes, or the sync engine
+          // reads applyRemote itself as an edit and loops.
           const merge = <T extends { id: string; updatedAt: string }>(
             local: T[],
             incoming: T[] | undefined,
@@ -505,8 +461,8 @@ export const useStore = create<AppState>()(
             return out
           }
 
-          // Variáveis secretas chegam do servidor com valor vazio:
-          // preserva o valor local desta máquina, casando por chave.
+          // Secret variables arrive empty from the server: keep this machine's
+          // local value, matched by key.
           const mergeEnv = (local: Environment | undefined, remote: Environment): Environment => ({
             ...remote,
             variables: remote.variables.map((v) => {
@@ -516,9 +472,8 @@ export const useStore = create<AppState>()(
             }),
           })
 
-          // Tudo que chega pertence ao project conectado. Re-etiquetar defende
-          // contra linhas gravadas por um cliente antigo, que subia o
-          // `projectId` local dele: sem isto a sidebar filtra e não mostra nada.
+          // Everything incoming belongs to the connected project; re-tagging
+          // guards against rows an older client pushed with its own id.
           const projectId = s.connection.projectId
           const tag = <T extends { projectId: string }>(items: T[] | undefined) =>
             projectId
@@ -536,7 +491,7 @@ export const useStore = create<AppState>()(
               ? s.selectedRequestId
               : null,
             openTabs: s.openTabs.filter((id) => requests.some((r) => r.id === id)),
-            // env que sumiu no remoto não pode ficar ativo em collection nenhuma
+            // an env gone on the remote cannot stay active in any collection
             activeEnvByCollection: Object.fromEntries(
               Object.entries(s.activeEnvByCollection).map(([colId, envId]) => [
                 colId,
@@ -564,10 +519,10 @@ export const useStore = create<AppState>()(
           ),
         })),
 
-      /** Apagar um project leva as collections dele (e o que pende delas). */
+      /** Deleting a project takes its collections (and whatever hangs off them). */
       deleteProject: (id) =>
         set((s) => {
-          if (s.projects.length <= 1) return s // sempre sobra um project
+          if (s.projects.length <= 1) return s // one project always remains
           const colIds = new Set(s.collections.filter((c) => c.projectId === id).map((c) => c.id))
           const reqIds = s.requests
             .filter((r) => r.projectId === id || (r.collectionId && colIds.has(r.collectionId)))
@@ -579,15 +534,15 @@ export const useStore = create<AppState>()(
           const keyring = { ...s.keyring }
           delete keyring[id]
           const nextOpen = s.openProjectId === id ? (projects[0]?.id ?? null) : s.openProjectId
-          // Apagou o project conectado: a conexão passa a ser a do project que
-          // ficou aberto, ou nenhuma.
+          // Deleted the connected project: the connection becomes the one of
+          // whatever project stayed open, or none.
           const nextConnection = (nextOpen && keyring[nextOpen]) || NO_CONNECTION
           return {
             projects,
             keyring,
             connection: nextConnection,
-            // `lastSyncAt` é por conexão: trocou de conexão, o próximo sync
-            // tem que ser completo.
+            // `lastSyncAt` is per connection: a new connection means the next
+            // sync must be a full one.
             lastSyncAt: nextConnection.key === s.connection.key ? s.lastSyncAt : null,
             collections: s.collections.filter((c) => !colIds.has(c.id)),
             requests: s.requests.filter((r) => !reqIds.includes(r.id)),
@@ -606,8 +561,8 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      // Trocar de project troca a conexão: o MVP sincroniza um project por
-      // máquina, e a chave de cada um está no keyring.
+      // Switching project switches the connection: the MVP syncs one project
+      // per machine, and each key lives in the keyring.
       openProject: (id) =>
         set((s) => {
           const saved = s.keyring[id] ?? NO_CONNECTION
@@ -618,8 +573,8 @@ export const useStore = create<AppState>()(
             openProjectId: id,
             openCollectionId: null,
             connection: saved,
-            // `lastSyncAt` é por conexão: mantê-lo faria o pull do project novo
-            // pedir só o que mudou depois de um sync que foi de outro project.
+            // `lastSyncAt` is per connection: keeping it would make the new
+            // project pull only what changed after another project's sync.
             lastSyncAt: null,
           }
         }),
@@ -697,7 +652,7 @@ export const useStore = create<AppState>()(
           const doomed = s.requests
             .filter((r) => r.collectionId !== null && allColIds.has(r.collectionId))
             .map((r) => r.id)
-          // environment pertence à collection: apagar a collection apaga os envs dela
+          // an environment belongs to its collection, so deleting one deletes its envs
           const doomedEnvs = s.environments
             .filter((e) => allColIds.has(e.collectionId))
             .map((e) => e.id)
@@ -709,7 +664,7 @@ export const useStore = create<AppState>()(
               ? null
               : s.selectedRequestId,
             openTabs: s.openTabs.filter((id) => !doomed.includes(id)),
-            // apagou a collection aberta (ou uma ancestral dela)? volta pra lista
+            // deleted the open collection (or an ancestor)? back to the list
             openCollectionId: allColIds.has(s.openCollectionId ?? '')
               ? null
               : s.openCollectionId,
@@ -737,7 +692,7 @@ export const useStore = create<AppState>()(
                 s.openProjectId ??
                 s.projects[0]!.id,
               collectionId,
-              name: 'Nova request',
+              name: 'New request',
               method: 'GET' as const,
               url: '',
               headers: [],
@@ -776,9 +731,8 @@ export const useStore = create<AppState>()(
           },
         })),
 
-      // Selecionar é o que povoa a barra: veio da sidebar, do Ctrl+K ou de uma
-      // aba, a request passa a ter aba. `null` é o "voltar pro início" e não
-      // abre nada.
+      // Selecting is what fills the strip, wherever it came from. `null` is the
+      // "back to the start" case and opens nothing.
       selectRequest: (id) =>
         set((s) =>
           id === null
@@ -800,9 +754,8 @@ export const useStore = create<AppState>()(
           if (!s.openTabs.includes(id)) return s
           const openTabs = s.openTabs.filter((t) => t !== id)
           if (s.selectedRequestId !== id) return { openTabs }
-          // Fechou a aba ativa: cai na vizinha da direita e, na última, na da
-          // esquerda. Só entre abas da mesma collection — pular pra outra
-          // trocaria o environment por baixo de quem só fechou uma aba.
+          // Closing the active tab falls to the right neighbour, then the left,
+          // and only within the same collection — a jump would swap the env.
           const scope = tabScope(s.collections, s.requests, id)
           const siblings = s.openTabs.filter(
             (t) => tabScope(s.collections, s.requests, t) === scope,
@@ -818,8 +771,8 @@ export const useStore = create<AppState>()(
             openTabs: s.openTabs.filter(
               (t) => t === id || tabScope(s.collections, s.requests, t) !== scope,
             ),
-            // A aba que sobrou é a ativa: se a anterior era outra, ela acabou
-            // de fechar e deixar a seleção apontando pro nada.
+            // The surviving tab is the active one: any other selection just
+            // closed and would point at nothing.
             selectedRequestId: id,
           }
         }),
@@ -842,8 +795,8 @@ export const useStore = create<AppState>()(
           const copy: ApiRequest = {
             ...structuredClone(original),
             id: uid(),
-            name: `${original.name} (cópia)`,
-            // meio passo à frente: a cópia aparece logo abaixo do original
+            name: `${original.name} (copy)`,
+            // half a step ahead: the copy lands right below the original
             sortOrder: original.sortOrder + 0.5,
             version: 1,
             updatedAt: now(),
@@ -873,7 +826,7 @@ export const useStore = create<AppState>()(
 
           const position = new Map(ordered.map((r, i) => [r.id, i]))
 
-          // Só toca em quem realmente mudou — cada escrita vira um push no sync.
+          // Touch only what actually moved — every write becomes a sync push.
           let changed = false
           const requests = s.requests.map((r) => {
             const i = position.get(r.id)
@@ -897,8 +850,8 @@ export const useStore = create<AppState>()(
           const moved = s.collections.find((c) => c.id === id)
           if (!moved) return s
 
-          // Só as irmãs entram na dança: reindexar a lista global embaralharia
-          // a ordem das pastas dos outros pais (o índice vem relativo às irmãs).
+          // Only siblings take part: reindexing the global list would shuffle
+          // other parents' folders, since the index is relative to siblings.
           const others = s.collections
             .filter((c) => c.id !== id && c.parentId === moved.parentId && c.projectId === moved.projectId)
             .sort(bySortOrder)
@@ -915,10 +868,10 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      // Import (Insomnia/cURL): environments base extras são mesclados no base local.
+      // Import (Insomnia/cURL): extra base environments merge into the local base.
       importData: (data) =>
         set((s) => {
-          // Empurra o que chega pro fim da lista, senão colide com o sortOrder local.
+          // Push incoming items to the end, or they collide with the local sortOrder.
           const colOffset = nextSort(s.collections.filter((c) => c.parentId === null))
           const reqOffset = nextSort(s.requests)
 
@@ -941,10 +894,8 @@ export const useStore = create<AppState>()(
           return {
             collections,
             requests,
-            // Environments chegam do importer já pendurados na collection nova,
-            // com nomes únicos dentro dela. Mesclar no base local ou renomear
-            // contra os envs das OUTRAS collections era coisa do modelo antigo
-            // (env por workspace) — hoje só corromperia o import.
+            // The importer already hangs envs on the new collection with unique
+            // names; merging against other collections would corrupt the import.
             environments: [...s.environments, ...(data.environments ?? [])],
             selectedRequestId: first ?? s.selectedRequestId,
             openTabs: first ? withTab(s.openTabs, collections, requests, first) : s.openTabs,
@@ -954,7 +905,7 @@ export const useStore = create<AppState>()(
       addEnvironment: (collectionId) => {
         const id = uid()
         set((s) => {
-          // nome único e ordem contam só dentro da collection dona
+          // unique name and order only matter inside the owning collection
           const siblings = s.environments.filter((e) => e.collectionId === collectionId)
           return {
             environments: [
@@ -963,7 +914,7 @@ export const useStore = create<AppState>()(
                 id,
                 collectionId,
                 name: uniqueEnvName(
-                  'novo-env',
+                  'new-env',
                   siblings.map((e) => e.name),
                 ),
                 isBase: false,
@@ -1011,7 +962,7 @@ export const useStore = create<AppState>()(
           const moved = s.environments.find((e) => e.id === id)
           if (!moved) return s
 
-          // a ordem é relativa aos envs da mesma collection
+          // order is relative to the envs of the same collection
           const others = s.environments
             .filter((e) => e.id !== id && e.collectionId === moved.collectionId)
             .sort(bySortOrder)
@@ -1059,11 +1010,8 @@ export const useStore = create<AppState>()(
   ),
 )
 
-/**
- * Collection que manda no contexto de variáveis agora: a raiz da request
- * aberta ou, sem request, a collection aberta na sidebar. Environment pertence
- * à collection, então sem collection não há variável.
- */
+/** The collection driving the variable context: the open request's root or, with
+ *  no request, the open collection. No collection means no variables. */
 export function useContextCollectionId(): string | null {
   return useStore((s) => {
     const selected = s.requests.find((r) => r.id === s.selectedRequestId)
@@ -1095,14 +1043,8 @@ export function useBaseEnv() {
 
 const NO_ENVS: Environment[] = []
 
-/**
- * Environments da collection em contexto.
- *
- * O filtro fica FORA do seletor de propósito: seletor que devolve array novo a
- * cada chamada faz o zustand achar que o estado mudou e o React entra em loop
- * ("getSnapshot should be cached"). Aqui o seletor devolve a referência crua e
- * o recorte acontece num useMemo.
- */
+/** Filtering happens in a useMemo, not in the selector: a selector returning a
+ *  fresh array every call makes zustand see a change and React loop. */
 export function useCollectionEnvs(collectionId: string | null): Environment[] {
   const environments = useStore((s) => s.environments)
   return useMemo(
@@ -1116,20 +1058,8 @@ export function useSelectedRequest() {
   return useStore((s) => s.requests.find((r) => r.id === s.selectedRequestId) ?? null)
 }
 
-/**
- * Abas visíveis: as da collection em contexto, na ordem em que entraram.
- *
- * O recorte mora aqui, e não dentro do `openTabs`, porque são duas perguntas
- * diferentes: o estado guarda tudo que a pessoa abriu, e a barra mostra só o
- * pedaço da collection de agora. Trocar de collection não fecha nada — as
- * abas da outra voltam quando você volta. E id de request que sumiu (apagada
- * no colega, project trocado) nunca chega a virar aba na tela, mesmo se algum
- * caminho de poda deixar passar.
- *
- * O filtro fica num `useMemo` pelo mesmo motivo do `useCollectionEnvs`:
- * seletor que devolve array novo a cada chamada faz o zustand achar que o
- * estado mudou e o React entra em loop.
- */
+/** State keeps every tab the person opened; the strip shows only the current
+ *  collection's slice, so switching collection hides tabs instead of closing them. */
 export function useVisibleTabs(): ApiRequest[] {
   const openTabs = useStore((s) => s.openTabs)
   const requests = useStore((s) => s.requests)

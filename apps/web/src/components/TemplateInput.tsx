@@ -18,11 +18,8 @@ interface Props {
   className?: string
 }
 
-/**
- * Input com overlay que colore {{vars}}: roxo quando o environment ativo
- * resolve a variável, vermelho quando ela não existe. Abrir `{{` lista as
- * variáveis disponíveis.
- */
+/** Input with an overlay that colors {{vars}}: purple when the active environment
+ *  resolves it, red when it does not exist. Typing `{{` lists what is available. */
 export function TemplateInput({ value, onChange, ctx, placeholder, className = '' }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -31,13 +28,13 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
   const [rect, setRect] = useState<DOMRect | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
-  // Sem teto de itens: a lista rola. Cortar em N escondia variáveis sem avisar
-  // (um `token` no fim do alfabeto simplesmente não aparecia).
+  // No item cap: the list scrolls. Cutting at N hid variables silently — a
+  // `token` late in the alphabet simply never showed up.
   const names = suggesting ? rankVariables(Object.keys(ctx), suggesting.query) : []
   const open = suggesting !== null && names.length > 0
 
-  // A lista é ancorada no input em coordenadas de viewport: ela vive num portal
-  // pra não ser cortada pelos `overflow-hidden` dos grupos (URL, headers...).
+  // Anchored to the input in viewport coordinates and rendered in a portal, so
+  // the groups' `overflow-hidden` cannot clip it.
   useLayoutEffect(() => {
     if (!open) return setRect(null)
     const measure = () => setRect(inputRef.current?.getBoundingClientRect() ?? null)
@@ -54,12 +51,12 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
     setHighlighted(0)
   }, [suggesting?.query])
 
-  // Navegar com as setas não pode deixar o item destacado fora da área visível.
+  // Arrow navigation must not leave the highlighted item out of view.
   useEffect(() => {
     listRef.current?.children[highlighted]?.scrollIntoView({ block: 'nearest' })
   }, [highlighted])
 
-  /** Reavalia o gatilho a partir do texto e da posição do caret. */
+  /** Re-evaluates the trigger from the text and the caret position. */
   const detect = (text: string, caret: number) => setSuggesting(findOpenToken(text, caret))
 
   const accept = (name: string) => {
@@ -79,7 +76,7 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
     return (
       <span
         key={i}
-        title={known ? ctx[name] : 'Variável não definida no environment ativo'}
+        title={known ? ctx[name] : 'Variable not defined in the active environment'}
         className={
           known
             ? 'rounded-sm bg-brand/15 text-brand-hi'
@@ -125,7 +122,7 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
           }
         }}
         onKeyUp={(e) => {
-          // setas e Home/End movem o caret sem disparar onChange
+          // arrows and Home/End move the caret without firing onChange
           if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
             detect(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)
           }
@@ -147,7 +144,7 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
         createPortal(
           <ul
             role="listbox"
-            aria-label="Variáveis do environment"
+            aria-label="Environment variables"
             style={{
               position: 'fixed',
               top: rect.bottom + 4,
@@ -162,7 +159,7 @@ export function TemplateInput({ value, onChange, ctx, placeholder, className = '
               <li key={name}>
                 <button
                   type="button"
-                  // mousedown: o blur do input chegaria antes de um click
+                  // mousedown: the input's blur would land before a click
                   onMouseDown={(e) => {
                     e.preventDefault()
                     accept(name)

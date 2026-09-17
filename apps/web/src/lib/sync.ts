@@ -22,12 +22,8 @@ export function onSyncStatus(l: (s: SyncStatus) => void) {
   return () => listeners.delete(l)
 }
 
-/**
- * O servidor filtra o escopo de uma chave de collection pelo
- * `rootCollectionId` de cada linha — e quem sabe a hierarquia é o cliente.
- * Sem esta anotação, requests e subpastas subiriam sem escopo e ficariam
- * invisíveis pra quem entrou com uma chave de collection.
- */
+/** The server scopes a collection key by each row's `rootCollectionId`, and only
+ *  the client knows the hierarchy — unscoped rows would be invisible to that key. */
 export function withScope(collections: Collection[]) {
   const rootOf = (id: string | null) => rootCollectionOf(collections, id)?.id ?? null
   return {
@@ -36,7 +32,7 @@ export function withScope(collections: Collection[]) {
   }
 }
 
-/** Valores de variáveis secretas nunca saem desta máquina. */
+/** Secret variable values never leave this machine. */
 function stripSecrets(env: Environment): Environment {
   return {
     ...env,
@@ -46,7 +42,7 @@ function stripSecrets(env: Environment): Environment {
 
 let syncing = false
 let queued = false
-/** Falhas seguidas — alimenta o recuo do polling. Zera no primeiro sucesso. */
+/** Consecutive failures — feeds the polling backoff. Resets on the first success. */
 let failures = 0
 
 export async function syncNow(): Promise<void> {
@@ -62,8 +58,8 @@ export async function syncNow(): Promise<void> {
   setStatus('syncing')
 
   try {
-    // Conexão salva antes de o `projectId` existir: amarra agora, senão não há
-    // como saber qual project local corresponde ao do servidor.
+    // Connection saved before `projectId` existed: bind it now, or there is no
+    // way to tell which local project matches the server's.
     if (!s.connection.projectId) {
       const info = await api.me(key)
       useStore.getState().adoptRemoteProject(info.project)
@@ -76,8 +72,8 @@ export async function syncNow(): Promise<void> {
     const changedOnly = <T extends { updatedAt: string }>(items: T[]) =>
       since ? items.filter((it) => it.updatedAt > since) : items
 
-    // Sobe só o project conectado. Os outros projects locais são desta máquina:
-    // sem este recorte, todos vazariam pra quem tem a chave deste.
+    // Push only the connected project: without this cut, every other local
+    // project would leak to whoever holds this one's key.
     const inProject = collectionIdsOfProject(s.collections, projectId)
     const mine = {
       collections: s.collections.filter((c) => c.projectId === projectId),
@@ -91,8 +87,8 @@ export async function syncNow(): Promise<void> {
       environments: [...s.pendingDeletes.environments],
     }
 
-    // Chave de leitura não empurra nada: o servidor recusaria com 403 e o
-    // status ficaria em erro permanente.
+    // A read key pushes nothing: the server would answer 403 and the status
+    // would sit in permanent error.
     const readOnly = role === 'read'
     const result = await api.sync(key, {
       since,
@@ -113,9 +109,9 @@ export async function syncNow(): Promise<void> {
     failures = 0
     setStatus('ok')
   } catch (err) {
-    // Só o primeiro erro da sequência vai pro console: com a API fora do ar,
-    // logar cada tentativa enterrava o resto das mensagens.
-    if (failures === 0) console.error('sync falhou:', err)
+    // Only the first error of a run reaches the console: with the API down,
+    // logging every attempt buried everything else.
+    if (failures === 0) console.error('sync failed:', err)
     failures++
     setStatus('error')
   } finally {
@@ -127,15 +123,8 @@ export async function syncNow(): Promise<void> {
   }
 }
 
-/**
- * O caminho normal do sync é reativo: mudança local dispara push (debounce de
- * 1200ms) e o WebSocket avisa de mudança remota. O polling abaixo existe só pro
- * caso do socket morrer calado — readyState continua OPEN e nada mais chega.
- *
- * Com o socket aberto ele é raro (5 min). Sem socket, cai pros 20s e recua
- * exponencialmente a cada falha, até 5 min: contra uma API fora do ar, insistir
- * de 20 em 20 segundos pra sempre só gasta bateria e enche o console.
- */
+/** Sync is reactive (debounced push plus WebSocket); this polling only covers a
+ *  socket that dies silently, and backs off so a dead API is not hammered. */
 const POLL_WS_OPEN_MS = 5 * 60_000
 const POLL_WS_DOWN_MS = 20_000
 const POLL_MAX_MS = 5 * 60_000
@@ -165,11 +154,11 @@ function connectWs(key: string) {
   if (wsKey === key && ws && ws.readyState <= WebSocket.OPEN) return
   ws?.close()
   wsKey = key
-  // a chave vai no subprotocolo, não na query: query entra em log de acesso
+  // the key goes in the subprotocol, not the query: queries land in access logs
   ws = new WebSocket(wsUrl(), [key])
   ws.onmessage = () => void syncNow()
   ws.onclose = () => {
-    // Reconecta se a chave ainda é a mesma (revogar troca isso pra null).
+    // Reconnect while the key is still the same (revoking sets it to null).
     setTimeout(() => {
       const s = useStore.getState()
       if (s.connection.key && wsKey === s.connection.key) {
@@ -180,7 +169,7 @@ function connectWs(key: string) {
   }
 }
 
-/** Liga o sync contínuo: push debounced a cada mudança + WS + polling de segurança. */
+/** Starts continuous sync: debounced push on change, WebSocket, and safety polling. */
 export function startSyncEngine() {
   if (started) return
   started = true
@@ -211,7 +200,7 @@ export function startSyncEngine() {
 
   schedulePoll()
 
-  // Sync inicial se a chave persistida ainda estiver lá.
+  // Initial sync if the persisted key is still there.
   const s = useStore.getState()
   if (s.connection.key) {
     connectWs(s.connection.key)

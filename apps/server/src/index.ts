@@ -8,7 +8,7 @@ import * as schema from './db/schema.js'
 
 const DATABASE_URL =
   process.env.DATABASE_URL ?? 'postgres://postgres:somnolent@localhost:5435/somnolent'
-// Se definido, criar project exige este segredo. Vazio = criação livre (local).
+// When set, creating a project requires this secret. Empty = open creation (local).
 const CREATE_TOKEN = process.env['PROJECT_CREATE_TOKEN']
 const PORT = Number(process.env.PORT ?? 4000)
 
@@ -20,17 +20,16 @@ await migrate(db, { migrationsFolder })
 
 const app = buildApp({ db, createToken: CREATE_TOKEN })
 await app.listen({ port: PORT, host: '0.0.0.0' })
-console.log(`somnolent server em http://localhost:${PORT}`)
+console.log(`somnolent server at http://localhost:${PORT}`)
 
-// Orquestrador reinicia contêiner o tempo todo (deploy, health check, reschedule).
-// Sem isto, cada parada corta requests no meio e deixa conexão pendurada no
-// Postgres até o servidor expirar por conta própria.
+// The orchestrator restarts the container all the time; without this, each stop
+// cuts requests midway and leaves connections hanging in Postgres.
 let closing = false
 for (const sinal of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sinal, () => {
     if (closing) return
     closing = true
-    console.log(`${sinal} recebido, encerrando…`)
+    console.log(`${sinal} received, shutting down…`)
     void app
       .close()
       .then(() => pool.end())

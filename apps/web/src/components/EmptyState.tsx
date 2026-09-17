@@ -2,7 +2,7 @@ import { FolderPlus, Import, Layers, Plus, Search } from 'lucide-react'
 import { useStore } from '../store'
 import { Logo } from './Logo'
 
-/** Atalho da tela vazia: ícone, título, uma linha de explicação. */
+/** Empty-screen shortcut: icon, title, one line of explanation. */
 function Action({
   icon,
   title,
@@ -39,11 +39,8 @@ function Action({
   )
 }
 
-/**
- * Tela do meio quando não há request aberta. Tem duas caras, porque as saídas
- * são diferentes: sem collection escolhida, o caminho é criar ou importar uma;
- * dentro de uma collection, é criar a primeira request.
- */
+/** Two faces because the ways out differ: with no collection chosen, create or
+ *  import one; inside a collection, create the first request. */
 export function EmptyState() {
   const openCollectionId = useStore((s) => s.openCollectionId)
   const collections = useStore((s) => s.collections)
@@ -68,7 +65,7 @@ export function EmptyState() {
   return (
     <div
       role="region"
-      aria-label="Nenhuma request aberta"
+      aria-label="No request open"
       className="grid place-items-center overflow-y-auto bg-panel p-8"
     >
       <div className="flex w-full max-w-md flex-col gap-6">
@@ -78,18 +75,18 @@ export function EmptyState() {
             <>
               <h2 className="text-base font-semibold text-ink">{open.name}</h2>
               <p className="max-w-xs text-sm leading-relaxed text-ink-dim">
-                Escolha uma request na lateral, ou comece uma nova nesta collection.
+                Pick a request on the side, or start a new one in this collection.
               </p>
             </>
           ) : (
             <>
               <h2 className="text-base font-semibold text-ink">
-                {doProject.length > 0 ? 'Escolha uma collection' : 'Comece uma collection'}
+                {doProject.length > 0 ? 'Pick a collection' : 'Start a collection'}
               </h2>
               <p className="max-w-xs text-sm leading-relaxed text-ink-dim">
                 {doProject.length > 0
-                  ? `${doProject.length} collection(s) em ${project?.name ?? 'seu project'}. Abra uma na lateral pra ver as requests.`
-                  : `O project ${project?.name ?? ''} ainda está vazio. Crie uma collection ou traga a sua do Insomnia.`}
+                  ? `${doProject.length} collection(s) in ${project?.name ?? 'your project'}. Open one on the side to see its requests.`
+                  : `Project ${project?.name ?? ''} is still empty. Create a collection or bring yours from Insomnia.`}
               </p>
             </>
           )}
@@ -99,15 +96,15 @@ export function EmptyState() {
           {open ? (
             <Action
               icon={<Plus className="size-4" />}
-              title="Nova request"
-              hint={`Entra direto em ${open.name}.`}
+              title="New request"
+              hint={`Lands straight in ${open.name}.`}
               onClick={() => selectRequest(addRequest(open.id))}
             />
           ) : (
             <Action
               icon={<FolderPlus className="size-4" />}
-              title="Nova collection"
-              hint="Um grupo de requests — normalmente, uma API."
+              title="New collection"
+              hint="A group of requests — usually one API."
               onClick={() => openCollection(addCollection('Nova collection'))}
             />
           )}
@@ -115,16 +112,16 @@ export function EmptyState() {
           {!open && doProject.length > 0 && (
             <Action
               icon={<Layers className="size-4" />}
-              title={`Abrir ${doProject[0]!.name}`}
-              hint="A primeira da lista, pra você não precisar mirar."
+              title={`Open ${doProject[0]!.name}`}
+              hint="The first on the list, so you do not have to aim."
               onClick={() => openCollection(doProject[0]!.id)}
             />
           )}
 
           <Action
             icon={<Search className="size-4" />}
-            title="Buscar request"
-            hint="Por nome, URL ou método, em todo o project."
+            title="Search request"
+            hint="By name, URL or method, across the whole project."
             kbd="Ctrl K"
             onClick={buscar}
           />
@@ -132,11 +129,11 @@ export function EmptyState() {
           {!open && (
             <Action
               icon={<Import className="size-4" />}
-              title="Importar do Insomnia"
-              hint="Cole um export v5 ou v4, ou um comando curl."
+              title="Import from Insomnia"
+              hint="Paste a v5 or v4 export, or a curl command."
               onClick={() =>
                 document
-                  .querySelector<HTMLButtonElement>('[aria-label^="Importar"]')
+                  .querySelector<HTMLButtonElement>('[aria-label^="Import"]')
                   ?.click()
               }
             />

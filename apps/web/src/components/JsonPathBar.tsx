@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { CircleHelp, X } from 'lucide-react'
 
-/** Os exemplos da ajuda, sobre uma API de livraria — os mesmos do Insomnia. */
+/** Help examples, over a bookstore API — the same ones Insomnia uses. */
 const EXAMPLES: { path: string; what: string }[] = [
-  { path: '$.store.books[*].title', what: 'o título de todos os livros' },
-  { path: '$.store.books[?(@.price < 10)].title', what: 'os livros abaixo de 10' },
-  { path: '$.store.books[-1:]', what: 'o último livro' },
-  { path: '$.store.books.length', what: 'quantos livros há' },
+  { path: '$.store.books[*].title', what: 'the title of every book' },
+  { path: '$.store.books[?(@.price < 10)].title', what: 'the books under 10' },
+  { path: '$.store.books[-1:]', what: 'the last book' },
+  { path: '$.store.books.length', what: 'how many books there are' },
 ]
 
 function Help({ onClose }: { onClose: () => void }) {
@@ -20,20 +20,20 @@ function Help({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      {/* Clique fora fecha, sem escurecer a tela por trás. */}
+      {/* Clicking outside closes, without dimming the screen behind. */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
         role="dialog"
-        aria-label="Ajuda do filtro JSONPath"
+        aria-label="JSONPath filter help"
         className="absolute right-2 bottom-10 z-50 w-96 max-w-[calc(100vw-2rem)] rounded-md border border-line bg-panel p-3 shadow-lg"
       >
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm text-ink-dim">
-            Use JSONPath para filtrar o body da response. Em uma API de livraria:
+            Use JSONPath to filter the response body. On a bookstore API:
           </p>
           <button
             onClick={onClose}
-            aria-label="Fechar ajuda"
+            aria-label="Close help"
             className="-mt-0.5 shrink-0 rounded p-0.5 text-ink-faint transition hover:bg-raised hover:text-ink"
           >
             <X aria-hidden className="size-3.5" />
@@ -53,14 +53,14 @@ function Help({ onClose }: { onClose: () => void }) {
           rel="noreferrer"
           className="mt-2.5 inline-block text-xs text-ink-dim underline transition hover:text-ink"
         >
-          Sintaxe completa (jsonpath-plus)
+          Full syntax (jsonpath-plus)
         </a>
       </div>
     </>
   )
 }
 
-/** Barra de filtro no pé da aba Body — só aparece com JSON na tela. */
+/** Filter bar at the foot of the Body tab — only shows with JSON on screen. */
 export function JsonPathBar({
   value,
   onChange,
@@ -79,7 +79,7 @@ export function JsonPathBar({
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        // Esc é o caminho curto de volta pro body inteiro.
+        // Esc is the short way back to the whole body.
         onKeyDown={(e) => {
           if (e.key === 'Escape' && value) {
             e.preventDefault()
@@ -88,26 +88,26 @@ export function JsonPathBar({
         }}
         spellCheck={false}
         autoComplete="off"
-        aria-label="Filtro JSONPath"
+        aria-label="JSONPath filter"
         aria-invalid={error !== null}
         placeholder="$.store.books[*].title"
         className={`min-w-0 flex-1 bg-transparent font-mono text-xs outline-none placeholder:text-ink-faint ${
           error ? 'text-bad' : 'text-ink'
         }`}
       />
-      {/* Erro ocupa o lugar da contagem: path quebrado não tem o que contar. */}
+      {/* The error takes the count's place: a broken path has nothing to count. */}
       {error ? (
         <span className="shrink-0 text-xs text-bad">{error}</span>
       ) : (
         matches !== null && (
           <span className="shrink-0 text-xs text-ink-faint">
-            {matches === 1 ? '1 resultado' : `${matches} resultados`}
+            {matches === 1 ? '1 result' : `${matches} results`}
           </span>
         )
       )}
       <button
         onClick={() => setHelp((open) => !open)}
-        aria-label="Ajuda do filtro JSONPath"
+        aria-label="JSONPath filter help"
         aria-expanded={help}
         className="shrink-0 rounded p-0.5 text-ink-faint transition hover:bg-raised hover:text-ink"
       >

@@ -23,9 +23,9 @@ function VariableRows({ env }: { env: Environment }) {
     <div className="flex flex-col gap-1">
       <div className="grid grid-cols-[28px_1fr_1.4fr_58px_28px] items-center gap-2 px-1 text-xs tracking-wider text-ink-faint uppercase">
         <span />
-        <span>chave</span>
-        <span>valor</span>
-        <span className="text-center">secreta</span>
+        <span>key</span>
+        <span>value</span>
+        <span className="text-center">secret</span>
         <span />
       </div>
       {env.variables.map((v, i) => (
@@ -40,7 +40,7 @@ function VariableRows({ env }: { env: Environment }) {
             checked={v.enabled}
             onChange={(e) => update(i, { enabled: e.target.checked })}
             className="mx-auto accent-brand"
-            title={v.enabled ? 'Desabilitar' : 'Habilitar'}
+            title={v.enabled ? 'Disable' : 'Enable'}
           />
           <input
             value={v.key}
@@ -49,7 +49,7 @@ function VariableRows({ env }: { env: Environment }) {
             onChange={(e) => update(i, { key: e.target.value })}
             title={
               dupeIndexes.has(i)
-                ? `Já existe outra variável "${v.key}" neste environment. Só uma vale no send — renomeie ou remova a repetida.`
+                ? `Another variable "${v.key}" already exists in this environment. Only one counts on send — rename or remove the duplicate.`
                 : undefined
             }
             className={`rounded bg-transparent px-2 py-1 font-mono text-sm placeholder:text-ink-faint focus:outline-none ${
@@ -60,7 +60,7 @@ function VariableRows({ env }: { env: Environment }) {
             <input
               value={v.value}
               type={v.secret && !revealed.has(i) ? 'password' : 'text'}
-              placeholder="Valor"
+              placeholder="Value"
               spellCheck={false}
               onChange={(e) => update(i, { value: e.target.value })}
               className="w-full rounded bg-transparent px-2 py-1 font-mono text-sm text-ink placeholder:text-ink-faint focus:outline-none"
@@ -76,8 +76,8 @@ function VariableRows({ env }: { env: Environment }) {
                   })
                 }
                 className="shrink-0 px-1 text-ink-faint hover:text-ink"
-                title={revealed.has(i) ? 'Ocultar valor' : 'Mostrar valor'}
-                aria-label={revealed.has(i) ? 'Ocultar valor' : 'Mostrar valor'}
+                title={revealed.has(i) ? 'Hide value' : 'Show value'}
+                aria-label={revealed.has(i) ? 'Hide value' : 'Show value'}
               >
                 {revealed.has(i) ? (
                   <EyeOff className="size-3.5" />
@@ -92,13 +92,13 @@ function VariableRows({ env }: { env: Environment }) {
             checked={v.secret}
             onChange={(e) => update(i, { secret: e.target.checked })}
             className="mx-auto accent-brand"
-            title="Secreta: o valor não vai pro sync, fica só nesta máquina"
+            title="Secret: the value never syncs, it stays on this machine"
           />
           <button
             onClick={() => setVars(env.variables.filter((_, j) => j !== i))}
             className="mx-auto text-ink-faint hover:text-bad"
-            title="Remover variável"
-            aria-label="Remover variável"
+            title="Remove variable"
+            aria-label="Remove variable"
           >
             <X className="size-3.5" />
           </button>
@@ -106,8 +106,8 @@ function VariableRows({ env }: { env: Environment }) {
       ))}
       {dupeIndexes.size > 0 && (
         <p className="px-1 py-0.5 text-xs text-bad">
-          Chave repetida neste environment: no send só uma vale (a última). Renomeie ou remova a
-          repetida.
+          Duplicate key in this environment: only one counts on send (the last). Rename or remove
+          the duplicate.
         </p>
       )}
       <button
@@ -117,7 +117,7 @@ function VariableRows({ env }: { env: Environment }) {
         className="flex w-fit items-center gap-1 rounded px-2 py-1 text-sm text-ink-faint transition hover:bg-raised hover:text-ink"
       >
         <Plus className="size-3.5" />
-        variável
+        Variable
       </button>
     </div>
   )
@@ -132,7 +132,7 @@ export function EnvManager({
   collectionName: string
   onClose: () => void
 }) {
-  // Environments desta collection — outra collection tem os seus.
+  // This collection's environments — another collection has its own.
   const environments = useCollectionEnvs(collectionId)
   const addEnvironment = useStore((s) => s.addEnvironment)
   const updateEnvironment = useStore((s) => s.updateEnvironment)
@@ -147,10 +147,10 @@ export function EnvManager({
 
   const selected = environments.find((e) => e.id === selectedId) ?? null
   const dupeEnvIds = duplicateEnvIds(environments)
-  // A ordem é a que a pessoa arrastou; o base não fica mais preso no topo.
+  // The order is the one dragged; the base one is no longer pinned to the top.
   const sorted = [...environments].sort(bySortOrder)
 
-  /** Índice do slot vira índice na lista sem o item arrastado. */
+  /** The slot index becomes an index in the list without the dragged item. */
   const commitDrop = (slot: number) => {
     if (dragId) {
       const from = sorted.findIndex((e) => e.id === dragId)
@@ -175,7 +175,7 @@ export function EnvManager({
           <div className="flex flex-col gap-0.5 px-3 pt-3 pb-1">
             <p
               className="text-xs font-semibold tracking-wider text-ink-faint uppercase"
-              title="Arraste para reordenar"
+              title="Drag to reorder"
             >
               Environments
             </p>
@@ -186,7 +186,7 @@ export function EnvManager({
           <div
             className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2"
             onDragOver={(e) => {
-              // Soltar no espaço vazio embaixo joga pro fim da lista.
+              // Dropping on the empty space below sends it to the end of the list.
               if (!dragId) return
               e.preventDefault()
               if (dropAt !== sorted.length) setDropAt(sorted.length)
@@ -247,14 +247,14 @@ export function EnvManager({
                   {env.name}
                 </span>
                 {dupeEnvIds.has(env.id) && (
-                  <span className="ml-auto flex shrink-0 items-center" title="Nome repetido">
-                    <TriangleAlert aria-label="Nome repetido" className="size-3.5 text-bad" />
+                  <span className="ml-auto flex shrink-0 items-center" title="Duplicate name">
+                    <TriangleAlert aria-label="Duplicate name" className="size-3.5 text-bad" />
                   </span>
                 )}
                 {env.isBase && (
                   <span
                     className="ml-auto shrink-0 text-xs text-ink-faint"
-                    title="Environment base: aplicado antes do ativo, em todos os outros"
+                    title="Base environment: applied before the active one, under all of them"
                   >
                     base
                   </span>
@@ -267,7 +267,7 @@ export function EnvManager({
             className="m-2 flex items-center justify-center gap-1 rounded-md border border-line px-2 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
           >
             <Plus className="size-3.5" />
-            environment
+            Environment
           </button>
         </div>
 
@@ -287,18 +287,18 @@ export function EnvManager({
                 />
                 {dupeEnvIds.has(selected.id) && (
                   <span className="text-xs text-bad">
-                    Já existe um environment com este nome.
+                    An environment with this name already exists.
                   </span>
                 )}
 
                 {selected.isBase ? (
-                  // O base nunca é o ativo, então não tem cor de destaque nem exclusão.
+                  // The base is never the active one, so no accent color and no delete.
                   <p className="min-w-0 flex-1 text-sm leading-relaxed text-ink-faint">
                     <span className="mr-1.5 rounded bg-raised px-1.5 py-0.5 text-xs text-ink-dim">
                       base
                     </span>
-                    Variáveis comuns a todos os environments — cada um pode sobrescrevê-las. O nome
-                    é só rótulo: este environment não aparece no seletor do topo.
+                    Variables shared by every environment — each one may override them. The name
+                    is only a label: this environment never shows in the top picker.
                   </p>
                 ) : (
                   <>
@@ -313,16 +313,16 @@ export function EnvManager({
                               : 'opacity-50 hover:opacity-100'
                           }`}
                           style={{ background: c }}
-                          title="Cor do environment"
+                          title="Environment color"
                         />
                       ))}
                     </div>
                     <button
                       onClick={async () => {
                         const ok = await confirm({
-                          title: `Excluir o environment "${selected.name}"?`,
-                          message: 'As variáveis dele se perdem, inclusive as secretas.',
-                          confirmLabel: 'Excluir environment',
+                          title: `Delete the environment "${selected.name}"?`,
+                          message: 'Its variables are lost, the secret ones included.',
+                          confirmLabel: 'Delete environment',
                           danger: true,
                         })
                         if (!ok) return
@@ -332,21 +332,21 @@ export function EnvManager({
                       className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-sm text-ink-faint transition hover:bg-bad/10 hover:text-bad"
                     >
                       <Trash2 className="size-3.5" />
-                      excluir
+                      Delete
                     </button>
                   </>
                 )}
               </>
             ) : (
-              <p className="text-sm text-ink-faint">Selecione um environment.</p>
+              <p className="text-sm text-ink-faint">Pick an environment.</p>
             )}
             <button
               onClick={onClose}
               className={`shrink-0 rounded px-2 py-1 text-ink-faint transition hover:bg-raised hover:text-ink ${
                 selected && !selected.isBase ? '' : 'ml-auto'
               }`}
-              title="Fechar"
-              aria-label="Fechar"
+              title="Close"
+              aria-label="Close"
             >
               <X className="size-4" />
             </button>
@@ -355,7 +355,7 @@ export function EnvManager({
             {selected ? (
               <VariableRows env={selected} />
             ) : (
-              <p className="text-sm text-ink-faint">Selecione um environment.</p>
+              <p className="text-sm text-ink-faint">Pick an environment.</p>
             )}
           </div>
         </div>

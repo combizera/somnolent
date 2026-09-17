@@ -30,7 +30,7 @@ type DropSpot =
   | { kind: 'collection'; id: string; edge: 'before' | 'after' | 'inside' }
   | { kind: 'root' }
 
-/** Metade de cima da linha = soltar antes; metade de baixo = soltar depois. */
+/** Top half of the row = drop before; bottom half = drop after. */
 function edgeOf(e: React.DragEvent): 'before' | 'after' {
   const rect = e.currentTarget.getBoundingClientRect()
   return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
@@ -45,7 +45,7 @@ function sameSpot(a: DropSpot | null, b: DropSpot): boolean {
 const LINE = 'pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-brand'
 
 interface DragProps {
-  /** Com filtro ativo a lista não reflete a ordem real, então o arraste sai de cena. */
+  /** With a filter on, the list is not the real order, so dragging steps aside. */
   enabled: boolean
   drag: DragItem | null
   setDrag: (d: DragItem | null) => void
@@ -85,11 +85,11 @@ function RequestRow({
         setSpot(null)
       }}
       onDragOver={(e) => {
-        // Uma pasta não entra dentro de uma request.
+        // A folder does not go inside a request.
         if (!drag || drag.kind === 'collection') return
         e.preventDefault()
-        // Sem isto o <nav> recebe o mesmo evento e sobrescreve o alvo com
-        // "raiz" — é o que fazia a indicação piscar durante o arraste.
+        // Without this the <nav> gets the same event and overwrites the target
+        // with "root" — that is what made the hint flicker mid-drag.
         e.stopPropagation()
         e.dataTransfer.dropEffect = 'move'
         const next: DropSpot = { kind: 'request', id: request.id, edge: edgeOf(e) }
@@ -120,8 +120,8 @@ function RequestRow({
             duplicateRequest(request.id)
           }}
           className="rounded px-1 text-ink-faint hover:text-ink"
-          title="Duplicar request"
-          aria-label="Duplicar request"
+          title="Duplicate request"
+          aria-label="Duplicate request"
         >
           <Copy className="size-3.5" />
         </button>
@@ -129,16 +129,16 @@ function RequestRow({
           onClick={async (e) => {
             e.stopPropagation()
             const ok = await confirm({
-              title: `Excluir a request "${request.name}"?`,
-              message: 'O histórico de respostas dela some junto. Não dá pra desfazer.',
-              confirmLabel: 'Excluir request',
+              title: `Delete the request "${request.name}"?`,
+              message: 'Its response history goes with it. This cannot be undone.',
+              confirmLabel: 'Delete request',
               danger: true,
             })
             if (ok) deleteRequest(request.id)
           }}
           className="rounded px-1 text-ink-faint hover:text-bad"
-          title="Excluir request"
-          aria-label="Excluir request"
+          title="Delete request"
+          aria-label="Delete request"
         >
           <X className="size-3.5" />
         </button>
@@ -147,11 +147,8 @@ function RequestRow({
   )
 }
 
-/**
- * Precisa viver no topo do módulo: declarado dentro do Sidebar, o React trataria
- * cada render como um componente novo e remontaria a pasta no meio do arraste,
- * derrubando os handlers antes do drop chegar.
- */
+/** Has to live at module top: declared inside Sidebar, React would treat every
+ *  render as a new component and remount the folder mid-drag. */
 function FolderHeader({
   col,
   collapsed,
@@ -183,7 +180,7 @@ function FolderHeader({
   const here = spot?.kind === 'collection' && spot.id === col.id ? spot : null
   const isSource = drag?.kind === 'collection' && drag.id === col.id
 
-  // Request cai dentro da pasta; outra pasta se reordena entre as irmãs.
+  // A request drops inside the folder; another folder reorders among siblings.
   const spotFor = (e: React.DragEvent): DropSpot =>
     drag?.kind === 'request'
       ? { kind: 'collection', id: col.id, edge: 'inside' }
@@ -227,7 +224,7 @@ function FolderHeader({
         className="size-4 shrink-0 text-ink-faint transition-transform"
         style={{ transform: collapsed ? 'rotate(-90deg)' : 'none' }}
       />
-      {/* o ícone diz o tipo (pasta), o chevron diz o estado (aberta/fechada) */}
+      {/* the icon says the type (folder), the chevron says the state */}
       {collapsed ? (
         <Folder aria-hidden className="size-3.5 shrink-0 text-ink-faint" />
       ) : (
@@ -249,7 +246,7 @@ function FolderHeader({
         <span
           onDoubleClick={onStartEditing}
           className="flex-1 truncate text-sm font-semibold text-ink-dim"
-          title="Arraste para reordenar · duplo clique para renomear"
+          title="Drag to reorder · double click to rename"
         >
           {col.name}
         </span>
@@ -261,8 +258,8 @@ function FolderHeader({
             addRequest(col.id)
           }}
           className="px-1 text-ink-faint hover:text-ink"
-          title="Nova request nesta pasta"
-          aria-label="Nova request nesta pasta"
+          title="New request in this folder"
+          aria-label="New request in this folder"
         >
           <Plus className="size-3.5" />
         </button>
@@ -272,8 +269,8 @@ function FolderHeader({
             onAddSub()
           }}
           className="px-1 text-ink-faint hover:text-ink"
-          title="Nova subpasta"
-          aria-label="Nova subpasta"
+          title="New subfolder"
+          aria-label="New subfolder"
         >
           <FolderPlus className="size-3.5" />
         </button>
@@ -281,16 +278,16 @@ function FolderHeader({
           onClick={async (e) => {
             e.stopPropagation()
             const ok = await confirm({
-              title: `Excluir a pasta "${col.name}"?`,
-              message: 'As requests e subpastas dentro dela vão junto.',
-              confirmLabel: 'Excluir pasta',
+              title: `Delete the folder "${col.name}"?`,
+              message: 'The requests and subfolders inside it go with it.',
+              confirmLabel: 'Delete folder',
               danger: true,
             })
             if (ok) deleteCollection(col.id)
           }}
           className="px-1 text-ink-faint hover:text-bad"
-          title="Excluir pasta"
-          aria-label="Excluir pasta"
+          title="Delete folder"
+          aria-label="Delete folder"
         >
           <X className="size-3.5" />
         </button>
@@ -299,10 +296,8 @@ function FolderHeader({
   )
 }
 
-/**
- * Linha da lista de collections (o nível de topo, estilo Insomnia): clicar
- * entra na collection em vez de expandir no mesmo aside.
- */
+/** Row of the collection list (the Insomnia-style top level): clicking enters
+ *  the collection instead of expanding it in place. */
 function CollectionRow({
   col,
   count,
@@ -320,7 +315,7 @@ function CollectionRow({
   const here = spot?.kind === 'collection' && spot.id === col.id ? spot : null
   const isSource = drag?.kind === 'collection' && drag.id === col.id
 
-  // Request solta em cima entra na collection; outra collection se reordena.
+  // A request dropped on top enters the collection; another one reorders.
   const spotFor = (e: React.DragEvent): DropSpot =>
     drag?.kind === 'request'
       ? { kind: 'collection', id: col.id, edge: 'inside' }
@@ -379,14 +374,14 @@ function CollectionRow({
             e.stopPropagation()
             setEditing(true)
           }}
-          title="Clique para abrir · duplo clique para renomear"
+          title="Click to open · double click to rename"
         >
           {col.name}
         </span>
       )}
       <span className="shrink-0 font-mono text-[10px] text-ink-faint">{count}</span>
-      {/* Apagar collection não fica aqui: é destrutivo demais pra um alvo que
-          divide hover com o clique de abrir. Mora dentro da collection. */}
+      {/* Deleting a collection does not live here: too destructive for a target
+          that shares hover with the click that opens it. */}
       <ChevronRight aria-hidden className="size-4 shrink-0 text-ink-faint" />
     </div>
   )
@@ -402,7 +397,7 @@ export function Sidebar() {
   const moveCollection = useStore((s) => s.moveCollection)
   const openCollectionId = useStore((s) => s.openCollectionId)
   const openProjectId = useStore((s) => s.openProjectId)
-  // Persistido: recarregar a página devolve as pastas como você deixou.
+  // Persisted: reloading the page gives the folders back as you left them.
   const expandedFolders = useStore((s) => s.expandedFolders)
   const toggleFolder = useStore((s) => s.toggleFolder)
   const expandFolders = useStore((s) => s.expandFolders)
@@ -420,13 +415,13 @@ export function Sidebar() {
   const [drag, setDrag] = useState<DragItem | null>(null)
   const [spot, setSpot] = useState<DropSpot | null>(null)
 
-  // Enquanto arrasta, o ponteiro do app inteiro vira "agarrando".
+  // While dragging, the whole app's pointer becomes "grabbing".
   useEffect(() => {
     document.body.classList.toggle('is-dragging', drag !== null)
     return () => document.body.classList.remove('is-dragging')
   }, [drag])
 
-  // Só as collections do project aberto: dois projects não se misturam na lista.
+  // Only the open project's collections: two projects never mix in the list.
   const sortedCollections = useMemo(
     () =>
       [...collections]
@@ -435,8 +430,8 @@ export function Sidebar() {
     [collections, openProjectId],
   )
 
-  // A collection aberta pode não existir mais (delete remoto pelo sync, cache
-  // velho do localStorage): nesse caso a lista é o fallback.
+  // The open collection may be gone (remote delete, stale localStorage): the
+  // list is the fallback in that case.
   const open = sortedCollections.find((c) => c.id === openCollectionId) ?? null
   const rootCollections = sortedCollections.filter((c) => c.parentId === null)
 
@@ -486,7 +481,7 @@ export function Sidebar() {
       if (target.kind !== 'collection' || target.id === drag.id) return clear()
       const dragged = collections.find((c) => c.id === drag.id)
       const anchor = collections.find((c) => c.id === target.id)
-      // Reordenar só faz sentido entre irmãs do mesmo pai.
+      // Reordering only makes sense among siblings of the same parent.
       if (!dragged || !anchor || dragged.parentId !== anchor.parentId) return clear()
       const others = sortedCollections.filter(
         (c) => c.parentId === dragged.parentId && c.id !== drag.id,
@@ -497,11 +492,11 @@ export function Sidebar() {
     }
 
     if (target.kind === 'root') {
-      // Dentro de uma collection, "raiz" é a própria collection aberta.
+      // Inside a collection, "root" is the open collection itself.
       const destination = open?.id ?? null
       moveRequest(drag.id, destination, siblingsOf(destination, drag.id).length)
     } else if (target.kind === 'collection') {
-      // Soltar sobre a pasta manda pro fim dela.
+      // Dropping on the folder sends it to the end of it.
       moveRequest(drag.id, target.id, siblingsOf(target.id, drag.id).length)
     } else {
       const anchor = requests.find((r) => r.id === target.id)
@@ -516,7 +511,7 @@ export function Sidebar() {
 
   const dragProps = { enabled: dndEnabled, drag, setDrag, spot, setSpot, onDrop: handleDrop }
 
-  // Pastas recolhíveis: tudo que pende da collection aberta, menos ela mesma.
+  // Collapsible folders: everything under the open collection, minus itself.
   const foldersInside = open
     ? [...subtreeIds(sortedCollections, open.id)].filter((id) => id !== open.id)
     : []
@@ -528,8 +523,8 @@ export function Sidebar() {
   const renderFolder = (col: Collection) => {
     const items = inFolder(col.id)
     const childCols = sortedCollections.filter((c) => c.parentId === col.id)
-    // Fechada por padrão: só abre o que está na lista de abertas (ou tudo,
-    // enquanto houver filtro — senão o resultado ficaria escondido).
+    // Collapsed by default: only what is in the open list expands, or everything
+    // while a filter is on — otherwise the hit would stay hidden.
     const isCollapsed = !expandedFolders.includes(col.id) && !q
     if (q && items.length === 0 && childCols.length === 0) return null
     return (
@@ -539,8 +534,8 @@ export function Sidebar() {
           collapsed={isCollapsed}
           onToggle={() => toggleFolder(col.id)}
           onAddSub={() => {
-            addSubCollection(col.id, 'Nova subpasta')
-            // criar subpasta dentro de uma fechada esconderia o que acabou de nascer
+            addSubCollection(col.id, 'New subfolder')
+            // creating a subfolder inside a closed one would hide what just appeared
             expandFolders([col.id])
           }}
           editing={editingId === col.id}
@@ -551,8 +546,8 @@ export function Sidebar() {
         {!isCollapsed && (
           <div
             className="mt-0.5 ml-2 flex flex-col gap-0.5 border-l border-line-soft pl-2"
-            // O corpo da pasta também aceita o drop: soltar no vão entre as
-            // linhas caía no <nav> e a request ia parar fora de qualquer pasta.
+            // The folder body takes the drop too: the gap between rows fell to
+            // the <nav> and the request ended up outside any folder.
             onDragOver={(e) => {
               if (!drag || drag.kind !== 'request') return
               e.preventDefault()
@@ -573,7 +568,7 @@ export function Sidebar() {
             ))}
             {items.length === 0 && childCols.length === 0 && (
               <p className="px-2 py-1 text-sm text-ink-faint">
-                {drag?.kind === 'request' ? 'Solte aqui' : 'Vazia'}
+                {drag?.kind === 'request' ? 'Drop here' : 'Empty'}
               </p>
             )}
           </div>
@@ -582,7 +577,7 @@ export function Sidebar() {
     )
   }
 
-  // ── nível 1: lista de collections ────────────────────────────────────────
+  // ── level 1: the collection list ─────────────────────────────────────────
   const renderCollectionList = () => {
     const shown = q
       ? rootCollections.filter(
@@ -606,7 +601,7 @@ export function Sidebar() {
         {looseRequests.length > 0 && (
           <div className="mt-2 flex flex-col gap-0.5">
             <p className="px-1 pt-1 pb-1 text-sm font-semibold text-ink-faint">
-              Sem collection
+              No collection
             </p>
             {looseRequests.map((r) => (
               <RequestRow key={r.id} request={r} {...dragProps} />
@@ -617,15 +612,15 @@ export function Sidebar() {
         {shown.length === 0 && looseRequests.length === 0 && (
           <p className="px-2 py-3 text-sm leading-relaxed text-ink-faint">
             {q
-              ? 'Nada bate com o filtro.'
-              : 'Crie uma collection ou importe um export do Insomnia.'}
+              ? 'Nothing matches the filter.'
+              : 'Create a collection or import an Insomnia export.'}
           </p>
         )}
       </>
     )
   }
 
-  // ── nível 2: dentro de uma collection ────────────────────────────────────
+  // ── level 2: inside a collection ─────────────────────────────────────────
   const renderInsideCollection = (col: Collection) => {
     const childCols = sortedCollections.filter((c) => c.parentId === col.id)
     const direct = inFolder(col.id)
@@ -636,7 +631,7 @@ export function Sidebar() {
 
         <div className="flex flex-col gap-0.5">
           {childCols.length > 0 && direct.length > 0 && (
-            <p className="px-1 pt-2 pb-1 text-sm font-semibold text-ink-faint">Sem pasta</p>
+            <p className="px-1 pt-2 pb-1 text-sm font-semibold text-ink-faint">No folder</p>
           )}
           {direct.map((r) => (
             <RequestRow key={r.id} request={r} {...dragProps} />
@@ -651,13 +646,13 @@ export function Sidebar() {
                 : 'border-line text-ink-faint'
             }`}
           >
-            soltar direto na collection
+            Drop straight into the collection
           </div>
         )}
 
         {childCols.length === 0 && direct.length === 0 && (
           <p className="px-2 py-3 text-sm leading-relaxed text-ink-faint">
-            {q ? 'Nenhuma request bate com o filtro.' : 'Collection vazia — crie a primeira request.'}
+            {q ? 'No request matches the filter.' : 'Empty collection — create the first request.'}
           </p>
         )}
       </>
@@ -676,8 +671,8 @@ export function Sidebar() {
                   setFilter('')
                 }}
                 className="rounded-md border border-line px-1.5 py-1.5 text-ink-dim transition hover:bg-raised hover:text-ink"
-                title="Voltar para as collections"
-                aria-label="Voltar para as collections"
+                title="Back to collections"
+                aria-label="Back to collections"
               >
                 <ChevronLeft className="size-4" />
               </button>
@@ -697,7 +692,7 @@ export function Sidebar() {
                 <span
                   onDoubleClick={() => setRenamingOpen(true)}
                   className="min-w-0 flex-1 truncate text-sm font-semibold text-ink"
-                  title={`${open.name} — duplo clique para renomear`}
+                  title={`${open.name} — double click to rename`}
                 >
                   {open.name}
                 </span>
@@ -705,24 +700,24 @@ export function Sidebar() {
               <button
                 onClick={() => openShare(open.id)}
                 className="shrink-0 rounded px-1.5 py-1 text-ink-faint transition hover:bg-raised hover:text-ink"
-                title="Compartilhar só esta collection"
-                aria-label="Compartilhar só esta collection"
+                title="Share this collection only"
+                aria-label="Share this collection only"
               >
                 <Share2 className="size-3.5" />
               </button>
               <button
                 onClick={async () => {
                   const ok = await confirm({
-                    title: `Excluir a collection "${open.name}"?`,
-                    message: `${countsByCollection.get(open.id) ?? 0} request(s), as pastas e os environments dela são apagados. Não dá pra desfazer.`,
-                    confirmLabel: 'Excluir collection',
+                    title: `Delete the collection "${open.name}"?`,
+                    message: `${countsByCollection.get(open.id) ?? 0} request(s), its folders and its environments are erased. This cannot be undone.`,
+                    confirmLabel: 'Delete collection',
                     danger: true,
                   })
                   if (ok) deleteCollection(open.id)
                 }}
                 className="shrink-0 rounded px-1.5 py-1 text-ink-faint transition hover:bg-bad/10 hover:text-bad"
-                title="Excluir esta collection"
-                aria-label="Excluir esta collection"
+                title="Delete this collection"
+                aria-label="Delete this collection"
               >
                 <Trash2 className="size-3.5" />
               </button>
@@ -733,21 +728,21 @@ export function Sidebar() {
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-hi"
               >
                 <Plus className="size-3.5" />
-                Nova request
+                New request
               </button>
               <button
-                onClick={() => addSubCollection(open.id, 'Nova pasta')}
+                onClick={() => addSubCollection(open.id, 'New folder')}
                 className="rounded-md border border-line px-2 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
-                title="Nova pasta nesta collection"
-                aria-label="Nova pasta nesta collection"
+                title="New folder in this collection"
+                aria-label="New folder in this collection"
               >
                 <FolderPlus className="size-4" />
               </button>
               <button
                 onClick={() => setImporting(true)}
                 className="rounded-md border border-line px-2 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
-                title="Importar do Insomnia ou de um comando curl"
-                aria-label="Importar do Insomnia ou de um comando curl"
+                title="Import from Insomnia or from a curl command"
+                aria-label="Import from Insomnia or from a curl command"
               >
                 <Import className="size-4" />
               </button>
@@ -756,17 +751,17 @@ export function Sidebar() {
         ) : (
           <div className="flex items-center gap-1">
             <button
-              onClick={() => openCollection(addCollection('Nova collection'))}
+              onClick={() => openCollection(addCollection('New collection'))}
               className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-hi"
             >
               <Plus className="size-3.5" />
-              Nova collection
+              New collection
             </button>
             <button
               onClick={() => setImporting(true)}
               className="rounded-md border border-line px-2 py-1.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
-              title="Importar do Insomnia ou de um comando curl"
-              aria-label="Importar do Insomnia ou de um comando curl"
+              title="Import from Insomnia or from a curl command"
+              aria-label="Import from Insomnia or from a curl command"
             >
               <Import className="size-4" />
             </button>
@@ -775,21 +770,21 @@ export function Sidebar() {
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder={open ? 'Filtrar requests' : 'Filtrar collections'}
+          placeholder={open ? 'Filter requests' : 'Filter collections'}
           className="w-full rounded-md border border-line bg-app px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
         />
         {foldersInside.length > 0 && (
           <button
             onClick={toggleAll}
             className="flex w-fit items-center gap-1.5 rounded px-1 py-0.5 text-sm text-ink-faint transition hover:text-ink"
-            title={allCollapsed ? 'Abrir todas as pastas' : 'Fechar todas as pastas'}
+            title={allCollapsed ? 'Expand all folders' : 'Collapse all folders'}
           >
             {allCollapsed ? (
               <ChevronsUpDown className="size-3.5" />
             ) : (
               <ChevronsDownUp className="size-3.5" />
             )}
-            {allCollapsed ? 'Abrir todas' : 'Fechar todas'}
+            {allCollapsed ? 'Expand all' : 'Collapse all'}
           </button>
         )}
       </div>

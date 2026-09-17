@@ -1,24 +1,21 @@
 import { describe, expect, it } from 'vitest'
 
-/**
- * Arquivo separado porque o store reidrata na importação do módulo: o
- * localStorage precisa estar sujo antes disso. É o teste que prova que o
- * saneamento está ligado no `persist`, e não só exportado.
- */
+/** A separate file because the store rehydrates on module import: localStorage
+ *  has to be dirty before that. */
 localStorage.setItem(
   'somnolent-layout',
-  // `null` é o que sobra de um NaN gravado: JSON.stringify(NaN) === 'null'
+  // `null` is what a stored NaN leaves behind: JSON.stringify(NaN) === 'null'
   JSON.stringify({ state: { sidebarWidth: null, requestSplit: null }, version: 0 }),
 )
 
 const { useLayout, SIDEBAR, SPLIT_DEFAULT } = await import('./layoutStore')
 
-describe('reidratação com valor corrompido no navegador', () => {
-  it('não deixa o null guardado chegar no estado', () => {
+describe('rehydration with a corrupted value in the browser', () => {
+  it('keeps the stored null out of the state', () => {
     const { sidebarWidth, requestSplit } = useLayout.getState()
     expect(sidebarWidth).toBe(SIDEBAR.default)
     expect(requestSplit).toBe(SPLIT_DEFAULT)
-    // sem isto o grid receberia `minmax(0,nullfr)` e quebraria a cada reload
+    // without this the grid would get `minmax(0,nullfr)` and break on each reload
     expect(Number.isFinite(sidebarWidth)).toBe(true)
     expect(Number.isFinite(requestSplit)).toBe(true)
   })

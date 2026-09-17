@@ -1,13 +1,11 @@
-/**
- * Copia texto pro clipboard. O `navigator.clipboard` exige contexto seguro
- * (HTTPS ou localhost) e permissão; onde faltar, cai numa textarea temporária.
- */
+/** `navigator.clipboard` needs a secure context and permission; where it is
+ *  missing, fall back to a throwaway textarea. */
 export async function copyText(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text)
     return
   } catch {
-    // segue pro fallback
+    // fall through to the fallback
   }
   const ta = document.createElement('textarea')
   ta.value = text

@@ -5,7 +5,7 @@ import { fieldLabel, inputClass, selectClass } from '../lib/ui'
 export function Modal({
   onClose,
   children,
-  /** Diálogo empilhado sobre outro modal precisa vir na frente. */
+  /** A dialog stacked over another modal has to come in front. */
   layer = 'z-50',
 }: {
   onClose: () => void
@@ -27,7 +27,7 @@ export function Modal({
   )
 }
 
-/** Campo somente-leitura com botão de copiar — usado pra chave e pro link. */
+/** Read-only field with a copy button — used for the key and the link. */
 export function CopyField({ value, hint }: { value: string; hint: string }) {
   const [copied, setCopied] = useState(false)
   return (
@@ -48,7 +48,7 @@ export function CopyField({ value, hint }: { value: string; hint: string }) {
           className="flex shrink-0 items-center gap-1 rounded-md border border-line px-2.5 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
         >
           {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          {copied ? 'Copiado' : 'Copiar'}
+          {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
       <p className="text-sm text-ink-faint">{hint}</p>
@@ -56,7 +56,7 @@ export function CopyField({ value, hint }: { value: string; hint: string }) {
   )
 }
 
-/** Rótulo + controle + dica, com o espaçamento igual em todos os diálogos. */
+/** Label + control + hint, with the same spacing in every dialog. */
 export function Field({
   label,
   hint,
@@ -75,7 +75,7 @@ export function Field({
   )
 }
 
-/** Select no idioma do app: chevron sobreposto, nunca o controle nativo. */
+/** Select in the app's language: overlaid chevron, never the native control. */
 export function Select({
   value,
   onChange,

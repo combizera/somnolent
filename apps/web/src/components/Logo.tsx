@@ -1,14 +1,9 @@
 import { useId } from 'react'
 
-/**
- * Marca do Somnolent — crescent com gradiente lilás→índigo e estrela branca
- * (variação "A · Gradiente" de logo-preview.html).
- *
- * É SVG escrito à mão de propósito: logo é marca, não ícone de UI — os ícones
- * da interface vêm todos do lucide-react.
- */
+/** Hand-written SVG on purpose: the logo is a brand mark, not a UI icon — every
+ *  interface icon comes from lucide-react. */
 export function Logo({ className }: { className?: string }) {
-  // os ids de gradient/mask precisam ser únicos por instância no documento
+  // gradient/mask ids must be unique per instance in the document
   const uid = useId()
   const gradient = `logo-crescent-${uid}`
   const mask = `logo-bite-${uid}`

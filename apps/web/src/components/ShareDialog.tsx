@@ -6,14 +6,8 @@ import { useSession } from '../sessionStore'
 import { CopyField, Field, Modal, Select } from './Modal'
 import { inputClass, linkFor } from '../lib/ui'
 
-/**
- * Compartilhar é uma ação, não um momento: dá pra chamar a qualquer hora e
- * quantas vezes quiser. A chave desta máquina fica salva localmente e é ela
- * que emite as dos outros — ninguém precisa ter guardado chave nenhuma.
- *
- * Se o project ainda só existe nesta máquina, o diálogo publica primeiro e
- * emite o link na sequência, num clique.
- */
+/** Sharing is an action, not a moment: this machine's key is stored locally and
+ *  issues everyone else's, so nobody has to have written a key down. */
 export function ShareDialog() {
   const { open, collectionId: preset } = useSession((s) => s.share)
   const closeShare = useSession((s) => s.closeShare)
@@ -52,7 +46,7 @@ function Share({ preset }: { preset: string | null }) {
   )
   const lockedCollection = collections.find((c) => c.id === connection.collectionId) ?? null
 
-  /** Publica o project (se preciso) e emite a chave do convidado. */
+  /** Publishes the project (if needed) and issues the guest key. */
   const share = async () => {
     setBusy(true)
     setError(null)
@@ -60,13 +54,13 @@ function Share({ preset }: { preset: string | null }) {
       let key = published ? connection.key! : null
       if (!key) {
         const created = await api.createProject(project!.name, createToken.trim() || undefined)
-        // Amarra antes de conectar: o project local vira o do servidor e o
-        // primeiro push leva o que já existe aqui.
+        // Bind before connecting: the local project becomes the server's, and
+        // the first push carries what already lives here.
         adoptRemoteProject({ id: created.id, name: created.name })
         connect(created.key, {
           scope: 'project',
           role: 'write',
-          label: 'Esta máquina',
+          label: 'This machine',
           projectId: created.id,
           projectName: created.name,
           collectionId: null,
@@ -74,19 +68,19 @@ function Share({ preset }: { preset: string | null }) {
         key = created.key
       }
       const issued = await api.createKey(key, {
-        label: label.trim() || 'Convidado',
+        label: label.trim() || 'Guest',
         role,
-        // Chave de collection só emite chave da própria collection.
+        // A collection key only issues keys for its own collection.
         collectionId:
           connection.scope === 'collection' ? connection.collectionId : scope || null,
       })
       setLink(linkFor(issued.key))
     } catch (err) {
-      // 401/403 na criação = o servidor exige o segredo; revela o campo.
+      // 401/403 on create = the server requires the secret; reveal the field.
       if (err instanceof ApiError && [401, 403].includes(err.status) && !published) {
         setNeedsToken(true)
       }
-      setError(err instanceof ApiError ? err.message : 'Não consegui falar com o servidor.')
+      setError(err instanceof ApiError ? err.message : 'Could not reach the server.')
     } finally {
       setBusy(false)
     }
@@ -97,11 +91,11 @@ function Share({ preset }: { preset: string | null }) {
       <div className="flex flex-col gap-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
           <ShieldAlert aria-hidden className="size-4 text-warn" />
-          Compartilhar
+          Share
         </h2>
         <p className="text-sm leading-relaxed text-ink-dim">
-          Sua chave é somente leitura, e chave de leitura não emite outras. Peça uma chave de
-          escrita a quem compartilhou este project com você.
+          Your key is read-only, and a read key issues no others. Ask whoever shared this project
+          with you for a write key.
         </p>
       </div>
     )
@@ -111,14 +105,14 @@ function Share({ preset }: { preset: string | null }) {
     return (
       <div className="flex flex-col gap-4">
         <div>
-          <h2 className="text-sm font-semibold text-ink">Link pronto</h2>
+          <h2 className="text-sm font-semibold text-ink">Link ready</h2>
           <p className="text-sm leading-relaxed text-ink-faint">
-            Vale até você revogar em <span className="text-ink-dim">Sync → Chaves ativas</span>.
+            Valid until you revoke it under <span className="text-ink-dim">Sync → Active keys</span>.
           </p>
         </div>
-        <CopyField value={link} hint="Aparece só agora — copie antes de fechar." />
-        {/* Gerar outra chave na sequência é o caso raro: quem acabou de copiar
-            o link quer fechar. */}
+        <CopyField value={link} hint="Shown only now — copy it before closing." />
+        {/* Issuing another key right after is the rare case: whoever just copied
+            the link wants to close. */}
         <div className="flex items-center gap-2">
           <button
             onClick={closeShare}
@@ -133,7 +127,7 @@ function Share({ preset }: { preset: string | null }) {
             }}
             className="rounded-md border border-line px-3 py-2 text-sm text-ink-dim transition hover:bg-raised hover:text-ink"
           >
-            Gerar outro link
+            Generate another link
           </button>
         </div>
       </div>
@@ -144,16 +138,16 @@ function Share({ preset }: { preset: string | null }) {
     <div className="flex flex-col gap-5">
       <div>
         <h2 className="text-sm font-semibold text-ink">
-          Compartilhar {project ? `"${project.name}"` : 'project'}
+          Share {project ? `"${project.name}"` : 'project'}
         </h2>
         <p className="text-sm leading-relaxed text-ink-faint">
           {published
-            ? 'Cada pessoa recebe a chave dela. Você nunca passa a sua.'
-            : 'Compartilhar publica ele no servidor e gera o link.'}
+            ? 'Everyone gets their own key. You never hand out yours.'
+            : 'Sharing publishes it on the server and generates the link.'}
         </p>
       </div>
 
-      <Field label="Nome" hint="Pra você reconhecer a chave depois.">
+      <Field label="Name" hint="So you recognize the key later.">
         <input
           autoFocus
           value={label}
@@ -164,25 +158,25 @@ function Share({ preset }: { preset: string | null }) {
         />
       </Field>
 
-      {/* Duas colunas iguais: os dois controles fecham na mesma largura e na
-          mesma altura do campo acima. */}
+      {/* Two equal columns: both controls close at the same width and the same
+          height as the field above. */}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Permissão">
+        <Field label="Permission">
           <Select value={role} onChange={(v) => setRole(v as 'write' | 'read')}>
-            <option value="read">Leitura</option>
-            <option value="write">Leitura e Escrita</option>
+            <option value="read">Read</option>
+            <option value="write">Read and write</option>
           </Select>
         </Field>
         {connection.scope === 'collection' ? (
-          // Chave de collection só emite chave da própria collection: não há
-          // escolha a fazer, só o que informar.
-          <Field label="Escopo">
+          // A collection key only issues keys for its own collection: nothing to
+          // choose, only something to state.
+          <Field label="Scope">
             <span className="flex h-9 items-center truncate text-sm text-ink-dim">
               Collection — {lockedCollection?.name ?? '—'}
             </span>
           </Field>
         ) : (
-          <Field label="Escopo">
+          <Field label="Scope">
             <Select value={scope} onChange={setScope}>
               <option value="">Project</option>
               {shareable.map((c) => (
@@ -196,11 +190,11 @@ function Share({ preset }: { preset: string | null }) {
       </div>
 
       {needsToken && (
-        <Field label="Segredo do servidor">
+        <Field label="Server secret">
           <input
             value={createToken}
             onChange={(e) => setCreateToken(e.target.value)}
-            placeholder="Este servidor exige um segredo pra criar project"
+            placeholder="This server requires a secret to create a project"
             className={inputClass}
           />
         </Field>
@@ -212,7 +206,7 @@ function Share({ preset }: { preset: string | null }) {
         className="flex h-9 w-fit items-center gap-1.5 rounded-md bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hi disabled:opacity-40"
       >
         {published ? <Link2 className="size-3.5" /> : <CloudUpload className="size-3.5" />}
-        {busy ? 'Gerando…' : published ? 'Gerar link' : 'Publicar e gerar link'}
+        {busy ? 'Generating…' : published ? 'Generate link' : 'Publish and generate link'}
       </button>
 
       {error && <p className="text-sm leading-relaxed text-bad">{error}</p>}

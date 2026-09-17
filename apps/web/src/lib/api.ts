@@ -25,7 +25,7 @@ async function call<T>(
     res = await fetch(`${API_URL}${path}`, {
       method: options.method ?? 'GET',
       headers: {
-        // Content-Type só quando há body — Fastify rejeita JSON vazio com 400.
+        // Content-Type only when there is a body — Fastify rejects empty JSON with 400.
         ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
         ...options.headers,
@@ -33,10 +33,9 @@ async function call<T>(
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     })
   } catch {
-    // `fetch` só rejeita antes de ter resposta: servidor fora do ar, DNS, CORS.
-    // Sem nomear o endereço, cada tela mostrava um "Falha ao ..." genérico e
-    // ninguém descobria que o problema era a API não estar de pé.
-    throw new ApiError(0, `Não consegui falar com a API em ${API_URL}. Ela está no ar?`)
+    // `fetch` only rejects before a response: server down, DNS, CORS. Naming the
+    // address beats the generic failure every screen used to show.
+    throw new ApiError(0, `Could not reach the API at ${API_URL}. Is it running?`)
   }
   const raw = await res.text()
   let data: { error?: string } = {}
@@ -44,23 +43,20 @@ async function call<T>(
     try {
       data = JSON.parse(raw)
     } catch {
-      // Resposta não-JSON quase sempre significa API_URL apontando pro lugar
-      // errado — o caso clássico é o próprio domínio da web, cujo nginx
-      // devolve o index.html em qualquer GET e 405 em POST. Sem este ramo, um
-      // 200 com HTML passaria como sucesso de corpo vazio e a falha só
-      // apareceria muito depois, sem pista da causa.
-      const type = res.headers.get('content-type')?.split(';')[0] ?? 'conteúdo desconhecido'
+      // Non-JSON almost always means API_URL points at the wrong host; without
+      // this branch a 200 with HTML would pass as an empty-body success.
+      const type = res.headers.get('content-type')?.split(';')[0] ?? 'unknown content'
       throw new ApiError(
         res.status,
-        `A API respondeu ${res.status} com ${type}, não JSON. Confira se VITE_API_URL aponta pro server do Somnolent — hoje está ${API_URL}.`,
+        `The API answered ${res.status} with ${type}, not JSON. Check that VITE_API_URL points at the Somnolent server — it is ${API_URL} today.`,
       )
     }
   }
-  if (!res.ok) throw new ApiError(res.status, data.error ?? `Erro ${res.status}`)
+  if (!res.ok) throw new ApiError(res.status, data.error ?? `Error ${res.status}`)
   return data as T
 }
 
-/** O que uma chave abre — resposta de GET /me. */
+/** What a key opens — the GET /me response. */
 export interface KeyInfo {
   scope: 'project' | 'collection'
   role: 'write' | 'read'
@@ -77,12 +73,12 @@ export interface KeyRow {
   collectionId: string | null
   createdAt: string
   lastUsedAt: string | null
-  /** É a chave com que esta máquina está conectada. */
+  /** The key this machine is connected with. */
   mine: boolean
 }
 
 export const api = {
-  /** Cria o project e devolve a primeira chave de escrita — ela só aparece aqui. */
+  /** Creates the project and returns the first write key — it is shown only here. */
   createProject: (name: string, createToken?: string) =>
     call<{ id: string; name: string; key: string }>('/projects', {
       method: 'POST',
@@ -149,16 +145,14 @@ export const api = {
       return {
         ok: false,
         timeMs: Math.round(performance.now() - started),
-        message: err instanceof Error ? `Proxy: ${err.message}` : 'Falha no proxy.',
+        message: err instanceof Error ? `Proxy: ${err.message}` : 'Proxy failed.',
       }
     }
   },
 }
 
-/**
- * A chave não vai na query: query entra em log de acesso. Ela viaja no
- * subprotocolo do WebSocket — ver o segundo argumento de `new WebSocket`.
- */
+/** The key rides in the WebSocket subprotocol, not the query: query strings
+ *  land in access logs. */
 export function wsUrl() {
   return `${API_URL.replace(/^http/, 'ws')}/sync/ws`
 }

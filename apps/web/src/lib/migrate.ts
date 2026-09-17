@@ -1,6 +1,6 @@
 import type { ApiRequest, Collection, Environment, Project } from '@somnolent/core'
 
-/** Estado persistido, com os campos que já existiram em versões anteriores. */
+/** Persisted state, with the fields earlier versions used to have. */
 export interface LegacyState {
   projects?: Project[]
   openProjectId?: string | null
@@ -16,18 +16,8 @@ interface Deps {
   now: () => string
 }
 
-/**
- * Migra o workspace salvo no localStorage entre versões do schema.
- *
- * v0 → v1: `Environment.sortOrder` não existia e a ordem era a de inserção.
- *          Congela essa ordem em números.
- *
- * v1 → v2: nasce o `Project`, `workspaceId` vira `projectId` e o environment
- *          passa a pertencer a uma collection. Os envs antigos eram do
- *          workspace inteiro, então são **copiados pra cada collection raiz** —
- *          eleger uma collection "dona" deixaria as outras sem variável, e
- *          request sem `{{ base_url }}` não resolve.
- */
+/** Migrates the saved workspace across schema versions. v2 copies the old
+ *  workspace-wide envs into every root collection — one owner would starve the rest. */
 export function migrateWorkspace(
   persisted: unknown,
   version: number,

@@ -25,13 +25,13 @@ function makeVars(...keys: string[]): EnvironmentVariable[] {
 }
 
 describe("normalizeEnvName", () => {
-  it("ignora caixa e espaços nas pontas", () => {
+  it("ignores case and surrounding spaces", () => {
     expect(normalizeEnvName("  Staging ")).toBe("staging");
   });
 });
 
 describe("duplicateEnvIds", () => {
-  it("aponta os dois lados de uma colisão que só difere na caixa", () => {
+  it("flags both sides of a collision that only differs in case", () => {
     const dupes = duplicateEnvIds([
       makeEnv("a", "staging"),
       makeEnv("b", "Staging"),
@@ -40,12 +40,12 @@ describe("duplicateEnvIds", () => {
     expect([...dupes].sort()).toEqual(["a", "b"]);
   });
 
-  it("trata espaço nas pontas como o mesmo nome", () => {
+  it("treats surrounding spaces as the same name", () => {
     const dupes = duplicateEnvIds([makeEnv("a", "prod"), makeEnv("b", " prod ")]);
     expect([...dupes].sort()).toEqual(["a", "b"]);
   });
 
-  it("marca todos quando há três iguais", () => {
+  it("marks all three when three names match", () => {
     const dupes = duplicateEnvIds([
       makeEnv("a", "novo-env"),
       makeEnv("b", "novo-env"),
@@ -54,42 +54,42 @@ describe("duplicateEnvIds", () => {
     expect(dupes.size).toBe(3);
   });
 
-  it("não reclama de nome vazio, que é o env recém-criado", () => {
+  it("stays quiet on an empty name, which is the freshly created env", () => {
     const dupes = duplicateEnvIds([makeEnv("a", ""), makeEnv("b", "   ")]);
     expect(dupes.size).toBe(0);
   });
 
-  it("não vê duplicata onde não há", () => {
+  it("sees no duplicate where there is none", () => {
     expect(duplicateEnvIds([makeEnv("a", "staging"), makeEnv("b", "prod")]).size).toBe(0);
   });
 });
 
 describe("duplicateVarIndexes", () => {
-  it("aponta chaves exatamente iguais", () => {
+  it("flags exactly equal keys", () => {
     const dupes = duplicateVarIndexes(makeVars("base_url", "token", "token"));
     expect([...dupes].sort()).toEqual([1, 2]);
   });
 
-  it("preserva o case-sensitive do engine: token e Token são distintas", () => {
+  it("keeps the engine case-sensitive: token and Token are distinct", () => {
     expect(duplicateVarIndexes(makeVars("token", "Token")).size).toBe(0);
   });
 
-  it("ignora linhas em branco", () => {
+  it("ignores blank rows", () => {
     expect(duplicateVarIndexes(makeVars("", "", "token")).size).toBe(0);
   });
 });
 
 describe("uniqueEnvName", () => {
-  it("devolve o nome pedido quando está livre", () => {
+  it("returns the asked name when it is free", () => {
     expect(uniqueEnvName("novo-env", ["staging"])).toBe("novo-env");
   });
 
-  it("sufixa até achar um livre", () => {
+  it("suffixes until it finds a free one", () => {
     expect(uniqueEnvName("novo-env", ["novo-env"])).toBe("novo-env 2");
     expect(uniqueEnvName("novo-env", ["novo-env", "novo-env 2"])).toBe("novo-env 3");
   });
 
-  it("considera colisão ignorando a caixa", () => {
+  it("counts a collision ignoring case", () => {
     expect(uniqueEnvName("staging", ["STAGING"])).toBe("staging 2");
   });
 });

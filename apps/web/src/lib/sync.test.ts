@@ -21,8 +21,8 @@ const col = (id: string, projectId: string): Collection => ({
   updatedAt: '2026-09-01T00:00:00.000Z',
 })
 
-describe('syncNow sobe só o project conectado', () => {
-  it('não empurra collections, requests nem environments dos outros projects', async () => {
+describe('syncNow pushes only the connected project', () => {
+  it('pushes no collections, requests or environments of other projects', async () => {
     const s = useStore.getState()
     const conectado = s.openProjectId!
     useStore.setState({
@@ -35,7 +35,7 @@ describe('syncNow sobe só o project conectado', () => {
         projectId: conectado,
       },
     })
-    // environment que pende da collection do outro project
+    // environment hanging off the other project's collection
     const outroEnv = { id: 'e-outro', collectionId: 'c-outro', name: 'prod', isBase: false,
       variables: [], sortOrder: 0, version: 1, updatedAt: '2026-09-01T00:00:00.000Z' }
     useStore.setState({ environments: [...useStore.getState().environments, outroEnv] })
@@ -50,13 +50,13 @@ describe('syncNow sobe só o project conectado', () => {
     expect(payload.changes.requests.every((r) => r.projectId === conectado)).toBe(true)
     expect(payload.changes.collections.map((c) => c.id)).not.toContain('c-outro')
     expect(payload.changes.environments.map((e) => e.id)).not.toContain('e-outro')
-    // e o que é do project conectado sobe
+    // and what belongs to the connected project does go up
     expect(payload.changes.collections.length).toBeGreaterThan(0)
   })
 })
 
-describe('sequência de falhas', () => {
-  /** Deixa o store com uma conexão válida, senão syncNow retorna sem fazer nada. */
+describe('a run of failures', () => {
+  /** Leaves the store with a valid connection, or syncNow returns doing nothing. */
   function conectado() {
     const s = useStore.getState()
     useStore.setState({
@@ -70,11 +70,11 @@ describe('sequência de falhas', () => {
     })
   }
 
-  it('loga só o primeiro erro da sequência, não um por tentativa', async () => {
+  it('logs only the first error of a run, not one per attempt', async () => {
     conectado()
     const console_ = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    // um sucesso primeiro zera o contador de falhas, que é estado de módulo
+    // a success first resets the failure counter, which is module state
     sync.mockResolvedValueOnce({ now: '2026-09-02T00:00:00.000Z', changes: {}, deletes: {} })
     await syncNow()
 
@@ -83,11 +83,11 @@ describe('sequência de falhas', () => {
     await syncNow()
     await syncNow()
 
-    // Com a API fora do ar o polling insiste sozinho; um log por tentativa
-    // enterrava qualquer outra mensagem no console.
+    // With the API down, polling keeps trying on its own; one log per attempt
+    // buried every other console message.
     expect(console_).toHaveBeenCalledTimes(1)
 
-    // e volta a logar depois que a coisa se recupera e quebra de novo
+    // and it logs again after a recovery followed by another break
     sync.mockResolvedValueOnce({ now: '2026-09-02T00:00:00.000Z', changes: {}, deletes: {} })
     await syncNow()
     await syncNow()

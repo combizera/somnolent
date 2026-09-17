@@ -14,7 +14,7 @@ export interface SendError {
   ok: false
   message: string
   timeMs: number
-  /** Falhou antes de ter resposta (offline, DNS, CORS) — candidato a reenvio pelo proxy. */
+  /** Failed before any response (offline, DNS, CORS) — candidate for a proxy retry. */
   network?: boolean
 }
 
@@ -50,7 +50,7 @@ export async function sendRequest(resolved: ResolvedRequest): Promise<SendResult
       timeMs: Math.round(performance.now() - started),
       network: isNetwork,
       message: isNetwork
-        ? 'Falha de rede: a API está fora do ar ou o navegador bloqueou por CORS. Faça login para reenviar automaticamente pelo proxy do servidor, que não sofre CORS.'
+        ? 'Network failure: the API is down or the browser blocked it by CORS. Sign in to retry automatically through the server proxy, which CORS does not affect.'
         : err instanceof Error
           ? err.message
           : String(err),

@@ -1,4 +1,4 @@
-/** Tom de cada método HTTP, compartilhado entre a sidebar e o seletor da request. */
+/** Tone per HTTP method, shared by the sidebar and the request's method picker. */
 export const METHOD_TEXT: Record<string, string> = {
   GET: 'text-get',
   POST: 'text-post',
@@ -19,5 +19,5 @@ export const METHOD_CHIP: Record<string, string> = {
   OPTIONS: 'bg-plain/15 text-plain',
 }
 
-/** Abreviação para caber no chip sem estourar a coluna da sidebar. */
+/** Short form so the chip fits the sidebar column. */
 export const METHOD_SHORT: Record<string, string> = { OPTIONS: 'OPTS', DELETE: 'DEL' }
